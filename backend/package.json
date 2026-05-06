@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "NexusAI Financial Dashboard - Backend API",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
