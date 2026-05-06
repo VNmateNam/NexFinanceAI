@@ -16,8 +16,11 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 // Verify Supabase connection
-supabase.from('price_cache').select('count').single().then(() => {
-  console.log('✅ Supabase connected');
-}).catch((err: Error) => {
-  console.error('❌ Supabase connection failed:', err.message);
-});
+(async () => {
+  try {
+    await supabase.from('price_cache').select('count').single();
+    console.log('✅ Supabase connected');
+  } catch (err) {
+    console.error('❌ Supabase connection failed:', (err as Error).message);
+  }
+})();

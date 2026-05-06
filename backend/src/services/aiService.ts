@@ -241,7 +241,7 @@ export async function getMarketSentimentSummary(): Promise<{
   const bullishCount = news.filter(n => n.ai_sentiment === 'bullish').length;
   const bearishCount = news.filter(n => n.ai_sentiment === 'bearish').length;
   const score = Math.round((bullishCount / Math.max(news.length, 1)) * 100);
-  const overall = score > 55 ? 'bullish' : score < 40 ? 'bearish' : 'neutral';
+  const overall: 'bullish' | 'bearish' | 'neutral' = score > 55 ? 'bullish' : score < 40 ? 'bearish' : 'neutral';
 
   const summary = {
     overall,
