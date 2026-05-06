@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  body {
+    background: #0a0b0f;
+    color: #f0f0f5;
+    font-family: 'Syne', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #0a0b0f; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-2 border border-border rounded-xl p-5;
+  }
+  .card-sm {
+    @apply bg-bg-2 border border-border rounded-xl p-4;
+  }
+  .btn-primary {
+    @apply bg-gold text-bg font-bold px-5 py-2.5 rounded-lg text-sm transition-all hover:bg-gold-dark active:scale-95;
+  }
+  .btn-outline {
+    @apply border border-border-light text-gray-400 font-semibold px-4 py-2 rounded-lg text-sm transition-all hover:border-gold hover:text-gold;
+  }
+  .btn-ghost {
+    @apply text-gray-400 font-medium px-3 py-1.5 rounded-lg text-sm transition-all hover:bg-bg-4 hover:text-white;
+  }
+  .badge-gold { @apply bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 text-xs font-bold px-2 py-0.5 rounded-full; }
+  .badge-green { @apply bg-green-400/10 text-green-400 border border-green-400/20 text-xs font-bold px-2 py-0.5 rounded-full; }
+  .badge-red { @apply bg-red-400/10 text-red-400 border border-red-400/20 text-xs font-bold px-2 py-0.5 rounded-full; }
+  .badge-blue { @apply bg-sky-400/10 text-sky-400 border border-sky-400/20 text-xs font-bold px-2 py-0.5 rounded-full; }
+  .badge-purple { @apply bg-violet-400/10 text-violet-400 border border-violet-400/20 text-xs font-bold px-2 py-0.5 rounded-full; }
+  .badge-gray { @apply bg-gray-400/10 text-gray-400 border border-gray-400/20 text-xs font-bold px-2 py-0.5 rounded-full; }
+
+  .input {
+    @apply w-full bg-bg-4 border border-border-light text-white placeholder-gray-600 px-3 py-2.5 rounded-lg text-sm outline-none transition-all focus:border-gold;
+  }
+  .select {
+    @apply w-full bg-bg-4 border border-border-light text-white px-3 py-2.5 rounded-lg text-sm outline-none transition-all focus:border-gold cursor-pointer;
+  }
+
+  .up { @apply text-green-400; }
+  .down { @apply text-red-400; }
+
+  .page-title { @apply text-2xl font-extrabold tracking-tight mb-1; }
+  .page-sub { @apply text-sm text-gray-400 mb-5; }
+  .section-label { @apply text-xs font-bold tracking-widest text-gray-600 uppercase; }
+}
+
+/* Ticker animation */
+.ticker-track { animation: ticker 35s linear infinite; }
+.ticker-track:hover { animation-play-state: paused; }
+
+/* Chart tooltip dark theme */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #1e1f28 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+}
+.recharts-tooltip-label { color: #9ca3af !important; font-size: 12px !important; }
+.recharts-tooltip-item { color: #f5c842 !important; font-family: 'Space Mono', monospace !important; font-size: 12px !important; }
+
+/* Live pulse dot */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+.live-dot { animation: livePulse 2s ease-in-out infinite; }
