@@ -14,6 +14,7 @@ import { authRouter } from './routes/auth';
 import { adminRouter } from './routes/admin';
 import { checkAlerts } from './services/alertChecker';
 import { refreshPriceCache } from './services/priceService';
+import { supabase } from './services/supabase';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -33,17 +34,50 @@ app.use('/api/ai/chat', rateLimit({ windowMs: 60 * 1000, max: 20 }));
 app.use('/api/ai/prediction', rateLimit({ windowMs: 60 * 1000, max: 30 }));
 
 // ── Routes ────────────────────────────────────────────────────
-app.use('/api/auth',      authRouter);
-app.use('/api/prices',    pricesRouter);
-app.use('/api/news',      newsRouter);
-app.use('/api/ai',        aiRouter);
-app.use('/api/alerts',    alertsRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/prices', pricesRouter);
+app.use('/api/news', newsRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api/alerts', alertsRouter);
 app.use('/api/portfolio', portfolioRouter);
-app.use('/api/admin',     adminRouter);
+app.use('/api/admin', adminRouter);
 
 // ── Health ────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '3.0.0' });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '3.0.0',
+    supabase_configured: !!process.env.SUPABASE_URL,
+    frontend_url: process.env.FRONTEND_URL || 'NOT SET',
+  });
+});
+
+// ── Debug: test token validation (use this to diagnose 401s) ──
+// Visit: https://your-railway-url.up.railway.app/debug/auth
+// With header: Authorization: Bearer <your-token>
+app.get('/debug/auth', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.json({
+      result: 'NO TOKEN',
+      hint: 'Send Authorization: Bearer <token> header',
+    });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    res.json({
+      result: error ? 'REJECTED' : 'ACCEPTED',
+      user_id: data?.user?.id ?? null,
+      user_email: data?.user?.email ?? null,
+      error: error?.message ?? null,
+      token_prefix: token.substring(0, 20) + '...',
+      supabase_url: process.env.SUPABASE_URL?.substring(0, 35) + '...',
+    });
+  } catch (err: any) {
+    res.json({ result: 'ERROR', message: err?.message });
+  }
 });
 
 // ── 404 ───────────────────────────────────────────────────────
