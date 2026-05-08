@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cron from 'node-cron';
 import { logger } from './services/logger';
+import { supabase } from './services/supabase';
 import { pricesRouter } from './routes/prices';
 import { newsRouter } from './routes/news';
 import { aiRouter } from './routes/ai';
@@ -14,16 +15,44 @@ import { authRouter } from './routes/auth';
 import { adminRouter } from './routes/admin';
 import { checkAlerts } from './services/alertChecker';
 import { refreshPriceCache } from './services/priceService';
-import { supabase } from './services/supabase';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// ── Security ─────────────────────────────────────────────────
-app.use(helmet());
+// ── CORS — must come BEFORE helmet and all routes ─────────────
+// Reads FRONTEND_URL from env; supports comma-separated list for multiple origins
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  ...(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map(u => u.trim())
+    .filter(Boolean),
+];
+
+logger.info(`Allowed CORS origins: ${allowedOrigins.join(', ')}`);
+
 app.use(cors({
-  origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(',').map(u => u.trim()),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    logger.warn(`CORS blocked origin: ${origin}`);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Authorization'],
+}));
+
+// Handle OPTIONS preflight for all routes
+app.options('*', cors());
+
+// ── Security (after CORS so helmet doesn't strip auth headers) ─
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: false,
 }));
 app.use(express.json({ limit: '10mb' }));
 
