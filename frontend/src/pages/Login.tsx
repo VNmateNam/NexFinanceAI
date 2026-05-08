@@ -1,21 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Zap, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { authApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 
 export function Login() {
-  const { isAuthenticated, setAuth, logout } = useAuthStore();
+  const { isAuthenticated, setAuth } = useAuthStore();
   const navigate = useNavigate();
-  const [email,   setEmail]   = useState('');
-  const [pw,      setPw]      = useState('');
-  const [showPw,  setShowPw]  = useState(false);
+  const [email, setEmail] = useState('');
+  const [pw, setPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
+  const [error, setError] = useState('');
 
-  // Clear any stale session when landing on login page
-  useEffect(() => { logout(); }, []);
-
+  // If already authenticated, go straight to dashboard
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   async function submit() {
@@ -102,7 +100,7 @@ export function Login() {
                   autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPw(s => !s)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
-                  {showPw ? <EyeOff size={14}/> : <Eye size={14}/>}
+                  {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
@@ -117,7 +115,7 @@ export function Login() {
           <button onClick={submit} disabled={loading}
             className="btn-primary w-full mt-4 h-11 flex items-center justify-center">
             {loading
-              ? <div className="w-4 h-4 border-2 border-bg/30 border-t-bg rounded-full animate-spin"/>
+              ? <div className="w-4 h-4 border-2 border-bg/30 border-t-bg rounded-full animate-spin" />
               : 'Sign In →'}
           </button>
 
@@ -133,7 +131,7 @@ export function Login() {
         </div>
 
         <div className="flex flex-wrap justify-center gap-2 mt-6">
-          {['Live Prices','AI Predictions','Smart Alerts','Email & SMS'].map(f => (
+          {['Live Prices', 'AI Predictions', 'Smart Alerts', 'Email & SMS'].map(f => (
             <span key={f} className="text-xs text-gray-600 bg-bg-2 border border-border px-2.5 py-1 rounded-full">{f}</span>
           ))}
         </div>
