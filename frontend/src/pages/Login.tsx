@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Zap, Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { authApi } from '../services/api';
+import { supabase } from '../services/supabase';
 import { useAuthStore } from '../store/authStore';
 
 export function Login() {
-  const { isAuthenticated, setAuth } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -13,39 +13,39 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // If already authenticated, go straight to dashboard
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   async function submit() {
     const trimEmail = email.trim().toLowerCase();
     if (!trimEmail) { setError('Please enter your email address.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimEmail)) { setError('Please enter a valid email address.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimEmail)) {
+      setError('Please enter a valid email address.'); return;
+    }
     if (!pw) { setError('Please enter your password.'); return; }
     if (pw.length < 6) { setError('Password must be at least 6 characters.'); return; }
 
     setLoading(true);
     setError('');
+
     try {
-      const data = await authApi.login(trimEmail, pw);
+      // Sign in directly with Supabase — handles token storage automatically
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: trimEmail,
+        password: pw,
+      });
 
-      if (!data?.session?.access_token) {
-        throw new Error('No session returned. Check your Supabase configuration.');
-      }
+      if (authError) throw authError;
+      if (!data.session) throw new Error('No session returned. Check Supabase configuration.');
 
-      // Save BOTH access token AND refresh token
-      setAuth(
-        data.user,
-        data.session.access_token,
-        data.session.refresh_token  // ← critical: needed to auto-refresh expired tokens
-      );
-
+      // onAuthStateChange in App.tsx fires automatically and sets the user.
+      // Just navigate — no manual token handling needed.
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      const msg = err.response?.data?.error ?? err.message ?? 'Login failed';
+      const msg = err?.message ?? 'Login failed';
       if (msg.includes('Invalid login credentials')) {
         setError('Incorrect email or password.');
       } else if (msg.includes('Email not confirmed')) {
-        setError('Please confirm your email before signing in. Check your inbox.');
+        setError('Please confirm your email before signing in.');
       } else {
         setError(msg);
       }
@@ -59,7 +59,6 @@ export function Login() {
         backgroundImage: 'linear-gradient(rgba(245,200,66,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(245,200,66,.5) 1px,transparent 1px)',
         backgroundSize: '60px 60px',
       }} />
-
       <div className="w-full max-w-sm relative">
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-12 h-12 bg-gradient-to-br from-gold to-gold-dark rounded-2xl flex items-center justify-center shadow-xl shadow-yellow-400/20">
@@ -87,7 +86,6 @@ export function Login() {
                   autoComplete="email" autoFocus />
               </div>
             </div>
-
             <div>
               <label className="text-xs text-gray-400 mb-1.5 block font-medium">Password</label>
               <div className="relative">
@@ -99,7 +97,7 @@ export function Login() {
                   onKeyDown={e => e.key === 'Enter' && submit()}
                   autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPw(s => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
                   {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
@@ -122,18 +120,11 @@ export function Login() {
           <div className="mt-4 p-3 bg-bg-3 border border-border rounded-lg">
             <p className="text-xs text-gray-500 leading-relaxed">
               Create users in{' '}
-              <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-gold underline">
-                Supabase Dashboard
-              </a>
+              <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer"
+                className="text-gold underline">Supabase Dashboard</a>
               {' '}→ Authentication → Users → Invite user
             </p>
           </div>
-        </div>
-
-        <div className="flex flex-wrap justify-center gap-2 mt-6">
-          {['Live Prices', 'AI Predictions', 'Smart Alerts', 'Email & SMS'].map(f => (
-            <span key={f} className="text-xs text-gray-600 bg-bg-2 border border-border px-2.5 py-1 rounded-full">{f}</span>
-          ))}
         </div>
       </div>
     </div>
