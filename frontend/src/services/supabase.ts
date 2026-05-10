@@ -1,18 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in environment');
-}
+if (!supabaseUrl) console.error('VITE_SUPABASE_URL not set');
+if (!supabaseAnonKey) console.error('VITE_SUPABASE_ANON_KEY not set');
 
-// Supabase manages session storage, token refresh, and expiry automatically.
-// No manual localStorage or token handling needed.
+console.log('[Supabase] connecting to:', supabaseUrl.substring(0, 35) || 'NOT SET');
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: true,   // refreshes access token before it expires
-    persistSession: true,   // stores session in localStorage under its own keys
-    detectSessionInUrl: true,   // handles magic link / OAuth redirects
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
   },
 });

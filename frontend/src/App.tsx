@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Markets } from './pages/Markets';
@@ -15,16 +15,20 @@ import api from './services/api';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, _hydrated } = useAuthStore();
+  const location = useLocation();
+
+  // Never block /login with a spinner
+  if (location.pathname === '/login') return <>{children}</>;
+
+  // Show spinner max 1.5s then redirect to login
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-          <p className="text-xs text-gray-500 font-mono">Loading…</p>
-        </div>
+        <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
       </div>
     );
   }
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -34,12 +38,46 @@ export default function App() {
   const { setUser, setHydrated, logout } = useAuthStore();
 
   useEffect(() => {
-    // Safety: unblock spinner after 3s even if Supabase never responds
-    const timeout = setTimeout(() => { setHydrated(); }, 3000);
+    // ALWAYS call setHydrated after 1.5s no matter what
+    // This guarantees the spinner never shows more than 1.5s
+    const timeout = setTimeout(() => {
+      console.log('[App] hydration timeout — forcing login page');
+      setHydrated();
+    }, 1500);
 
+    // Also try to get Supabase session directly (not via listener)
+    // This is faster than waiting for onAuthStateChange
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(timeout);
+      if (session?.user) {
+        api.get('/api/auth/me')
+          .then(r => { setUser(r.data.data); setHydrated(); })
+          .catch(() => {
+            setUser({
+              id: session.user.id,
+              email: session.user.email ?? '',
+              full_name: session.user.user_metadata?.full_name ?? '',
+              plan: 'free',
+              is_admin: false,
+              created_at: session.user.created_at ?? '',
+            });
+            setHydrated();
+          });
+      } else {
+        logout();
+        setHydrated();
+      }
+    }).catch(() => {
+      // Supabase completely unreachable
+      clearTimeout(timeout);
+      logout();
+      setHydrated();
+    });
+
+    // Also subscribe to future changes (login/logout/token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        clearTimeout(timeout);
+        if (event === 'INITIAL_SESSION') return; // handled above with getSession
         if (session?.user) {
           try {
             const profile = await api.get('/api/auth/me').then(r => r.data.data);
@@ -51,7 +89,7 @@ export default function App() {
               full_name: session.user.user_metadata?.full_name ?? '',
               plan: 'free',
               is_admin: false,
-              created_at: session.user.created_at ?? new Date().toISOString(),
+              created_at: session.user.created_at ?? '',
             });
           }
         } else {
@@ -73,7 +111,9 @@ export default function App() {
 
   return (
     <Routes>
+      {/* Login is always accessible — no spinner, no auth check */}
       <Route path="/login" element={<Login />} />
+
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
@@ -83,7 +123,7 @@ export default function App() {
         <Route path="ai" element={<AIChat />} />
         <Route path="admin" element={<Admin />} />
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
