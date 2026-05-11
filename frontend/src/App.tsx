@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Markets } from './pages/Markets';
@@ -15,12 +15,7 @@ import api from './services/api';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, _hydrated } = useAuthStore();
-  const location = useLocation();
 
-  // Never block /login with a spinner
-  if (location.pathname === '/login') return <>{children}</>;
-
-  // Show spinner max 1.5s then redirect to login
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
@@ -28,7 +23,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -38,21 +32,27 @@ export default function App() {
   const { setUser, setHydrated, logout } = useAuthStore();
 
   useEffect(() => {
-    // ALWAYS call setHydrated after 1.5s no matter what
-    // This guarantees the spinner never shows more than 1.5s
+    // Timeout: never block UI more than 2 seconds
     const timeout = setTimeout(() => {
-      console.log('[App] hydration timeout — forcing login page');
+      console.log('[App] auth timeout — showing login');
       setHydrated();
-    }, 1500);
+    }, 2000);
 
-    // Also try to get Supabase session directly (not via listener)
-    // This is faster than waiting for onAuthStateChange
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timeout);
+    // Get current session immediately (synchronous check)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) console.error('[App] getSession error:', error.message);
+      console.log('[App] session on load:', session ? `user=${session.user.email}` : 'none');
+
       if (session?.user) {
+        // Fetch backend profile
         api.get('/api/auth/me')
-          .then(r => { setUser(r.data.data); setHydrated(); })
+          .then(r => {
+            setUser(r.data.data);
+            clearTimeout(timeout);
+            setHydrated();
+          })
           .catch(() => {
+            // Backend unavailable — use Supabase user data
             setUser({
               id: session.user.id,
               email: session.user.email ?? '',
@@ -61,24 +61,23 @@ export default function App() {
               is_admin: false,
               created_at: session.user.created_at ?? '',
             });
+            clearTimeout(timeout);
             setHydrated();
           });
       } else {
         logout();
+        clearTimeout(timeout);
         setHydrated();
       }
-    }).catch(() => {
-      // Supabase completely unreachable
-      clearTimeout(timeout);
-      logout();
-      setHydrated();
     });
 
-    // Also subscribe to future changes (login/logout/token refresh)
+    // Also listen for future auth changes (login / logout / token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'INITIAL_SESSION') return; // handled above with getSession
-        if (session?.user) {
+        console.log('[App] auth event:', event, session?.user?.email ?? 'no user');
+
+        // SIGNED_IN fires after signInWithPassword succeeds
+        if (event === 'SIGNED_IN' && session?.user) {
           try {
             const profile = await api.get('/api/auth/me').then(r => r.data.data);
             setUser(profile);
@@ -92,10 +91,18 @@ export default function App() {
               created_at: session.user.created_at ?? '',
             });
           }
-        } else {
-          logout();
+          setHydrated();
         }
-        setHydrated();
+
+        if (event === 'SIGNED_OUT') {
+          logout();
+          setHydrated();
+        }
+
+        if (event === 'TOKEN_REFRESHED' && session?.user) {
+          // Token silently refreshed — no action needed, interceptor picks it up
+          console.log('[App] token refreshed silently');
+        }
       }
     );
 
@@ -111,9 +118,7 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Login is always accessible — no spinner, no auth check */}
       <Route path="/login" element={<Login />} />
-
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />

@@ -3,10 +3,11 @@ import { supabase } from './supabase';
 import { useAuthStore } from '../store/authStore';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
-console.log('[API] base URL:', API_BASE);
+console.log('[API] base:', API_BASE);
 
 export const api = axios.create({ baseURL: API_BASE, timeout: 15000 });
 
+// Attach Supabase session token to every request
 api.interceptors.request.use(async config => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
@@ -15,6 +16,7 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
+// On 401 — refresh session and retry once
 api.interceptors.response.use(
   res => res,
   async (err) => {
@@ -34,7 +36,10 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  logout: async () => { await supabase.auth.signOut(); await api.post('/api/auth/logout').catch(() => { }); },
+  logout: async () => {
+    await supabase.auth.signOut();
+    await api.post('/api/auth/logout').catch(() => { });
+  },
   me: () => api.get('/api/auth/me').then(r => r.data.data),
 };
 export const pricesApi = {
@@ -48,7 +53,8 @@ export const newsApi = {
 export const aiApi = {
   getSentiment: () => api.get('/api/ai/sentiment').then(r => r.data.data),
   getPrediction: (sym: string) => api.get(`/api/ai/prediction/${sym}`).then(r => r.data.data),
-  chat: (messages: { role: string; content: string }[]) => api.post('/api/ai/chat', { messages }).then(r => r.data.reply),
+  chat: (messages: { role: string; content: string }[]) =>
+    api.post('/api/ai/chat', { messages }).then(r => r.data.reply),
 };
 export const alertsApi = {
   getAlerts: () => api.get('/api/alerts').then(r => r.data.data),
@@ -65,6 +71,8 @@ export const portfolioApi = {
 export const adminApi = {
   getStats: () => api.get('/api/admin/stats').then(r => r.data.data),
   getUsers: (page = 1) => api.get(`/api/admin/users?page=${page}`).then(r => r.data),
-  updateUserPlan: (id: string, plan: string) => api.patch(`/api/admin/users/${id}/plan`, { plan }).then(r => r.data.data),
+  updateUserPlan: (id: string, plan: string) =>
+    api.patch(`/api/admin/users/${id}/plan`, { plan }).then(r => r.data.data),
 };
+
 export default api;

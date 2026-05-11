@@ -19,17 +19,32 @@ export function Login() {
     const trimEmail = email.trim().toLowerCase();
     if (!trimEmail) { setError('Please enter your email.'); return; }
     if (!pw || pw.length < 6) { setError('Password must be at least 6 characters.'); return; }
-    setLoading(true); setError('');
-    try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: trimEmail, password: pw,
-      });
-      if (authError) throw authError;
-      navigate('/dashboard', { replace: true });
-    } catch (err: any) {
-      const msg = err?.message ?? 'Login failed';
-      setError(msg.includes('Invalid login credentials') ? 'Incorrect email or password.' : msg);
+
+    setLoading(true);
+    setError('');
+
+    console.log('[Login] signing in with Supabase...');
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: trimEmail,
+      password: pw,
+    });
+
+    if (authError) {
+      console.error('[Login] error:', authError.message);
+      const msg = authError.message;
+      setError(
+        msg.includes('Invalid login credentials') ? 'Incorrect email or password.' :
+          msg.includes('Email not confirmed') ? 'Please confirm your email first.' :
+            msg
+      );
+      setLoading(false);
+      return;
     }
+
+    console.log('[Login] success, session:', data.session?.user?.email);
+    // onAuthStateChange SIGNED_IN in App.tsx will fire and set the user
+    // Navigate immediately — don't wait for it
+    navigate('/dashboard', { replace: true });
     setLoading(false);
   }
 
@@ -49,26 +64,33 @@ export function Login() {
             <p className="text-xs text-gray-500">Financial Intelligence Platform</p>
           </div>
         </div>
+
         <div className="card border-border-light shadow-2xl">
           <h2 className="text-lg font-bold mb-1">Sign in</h2>
           <p className="text-sm text-gray-500 mb-5">Enter your account credentials</p>
+
           <div className="space-y-3">
             <div>
               <label className="text-xs text-gray-400 mb-1.5 block font-medium">Email</label>
               <div className="relative">
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input className="input pl-9" type="email" placeholder="you@example.com"
-                  value={email} onChange={e => { setEmail(e.target.value); setError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && submit()} autoComplete="email" autoFocus />
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && submit()}
+                  autoComplete="email" autoFocus />
               </div>
             </div>
             <div>
               <label className="text-xs text-gray-400 mb-1.5 block font-medium">Password</label>
               <div className="relative">
                 <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
-                <input className="input pl-9 pr-10" type={showPw ? 'text' : 'password'} placeholder="••••••••"
-                  value={pw} onChange={e => { setPw(e.target.value); setError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && submit()} autoComplete="current-password" />
+                <input className="input pl-9 pr-10"
+                  type={showPw ? 'text' : 'password'} placeholder="••••••••"
+                  value={pw}
+                  onChange={e => { setPw(e.target.value); setError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && submit()}
+                  autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPw(s => !s)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
                   {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -76,12 +98,27 @@ export function Login() {
               </div>
             </div>
           </div>
-          {error && <div className="mt-3 p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-sm text-red-400">{error}</div>}
-          <button onClick={submit} disabled={loading} className="btn-primary w-full mt-4 h-11 flex items-center justify-center">
-            {loading ? <div className="w-4 h-4 border-2 border-bg/30 border-t-bg rounded-full animate-spin" /> : 'Sign In →'}
+
+          {error && (
+            <div className="mt-3 p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          <button onClick={submit} disabled={loading}
+            className="btn-primary w-full mt-4 h-11 flex items-center justify-center">
+            {loading
+              ? <div className="w-4 h-4 border-2 border-bg/30 border-t-bg rounded-full animate-spin" />
+              : 'Sign In →'}
           </button>
+
           <div className="mt-4 p-3 bg-bg-3 border border-border rounded-lg">
-            <p className="text-xs text-gray-500">Create users in <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-gold underline">Supabase Dashboard</a> → Authentication → Users → Invite user</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Create users in{' '}
+              <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer"
+                className="text-gold underline">Supabase Dashboard</a>
+              {' '}→ Authentication → Users → Invite user
+            </p>
           </div>
         </div>
       </div>

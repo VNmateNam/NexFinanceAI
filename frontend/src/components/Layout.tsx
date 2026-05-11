@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, TrendingUp, Briefcase, Bell, Bot, Shield, Zap, LogOut } from 'lucide-react';
-import { useMarketStore } from '../store/marketStore';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../services/supabase';
 import { LiveTicker } from './LiveTicker';
@@ -17,26 +16,23 @@ const NAV = [
 ];
 
 export function Layout() {
-  const { loading } = useMarketStore();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-
-  // Live clock in header — ticks every second
   const [now, setNow] = useState(() => new Date());
+
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1_000);
     return () => clearInterval(id);
   }, []);
 
   async function handleLogout() {
-    await supabase.auth.signOut();  // clears Supabase session from localStorage
-    logout();                        // clears our Zustand store
+    await supabase.auth.signOut();
+    logout();
     navigate('/login', { replace: true });
   }
 
   return (
     <div className="flex h-screen flex-col bg-bg overflow-hidden">
-      {/* Header */}
       <header className="h-14 bg-bg-2 border-b border-border flex items-center justify-between px-6 flex-shrink-0 z-50">
         <div className="flex items-center gap-6">
           <NavLink to="/dashboard" className="flex items-center gap-2.5">
@@ -60,7 +56,6 @@ export function Layout() {
           </nav>
         </div>
 
-        {/* Right side — LIVE badge with ticking clock + user avatar */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 bg-yellow-400/10 border border-yellow-400/20 rounded-full px-3 py-1">
             <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full live-dot" />
@@ -69,12 +64,8 @@ export function Layout() {
               {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
-
-          <button
-            onClick={handleLogout}
-            title={`Sign out (${user?.email ?? ''})`}
-            className="group w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-700 rounded-full flex items-center justify-center text-xs font-bold hover:opacity-80 transition-opacity"
-          >
+          <button onClick={handleLogout} title={`Sign out (${user?.email ?? ''})`}
+            className="group w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-700 rounded-full flex items-center justify-center text-xs font-bold hover:opacity-80 transition-opacity">
             <span className="group-hover:hidden">
               {user?.full_name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? 'U'}
             </span>
@@ -83,9 +74,7 @@ export function Layout() {
         </div>
       </header>
 
-      {/* Body */}
       <div className="flex flex-1 min-h-0">
-        {/* Sidebar */}
         <aside className="hidden lg:flex flex-col w-52 bg-bg-2 border-r border-border py-4 flex-shrink-0">
           <div className="flex-1 px-3 space-y-0.5">
             <p className="section-label px-2 py-2">Navigation</p>
@@ -93,16 +82,13 @@ export function Layout() {
               <NavLink key={to} to={to}
                 className={({ isActive }) => cn(
                   'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                  isActive
-                    ? 'bg-bg-4 text-gold border border-border-light'
-                    : 'text-gray-400 hover:bg-bg-3 hover:text-white'
+                  isActive ? 'bg-bg-4 text-gold border border-border-light' : 'text-gray-400 hover:bg-bg-3 hover:text-white'
                 )}>
                 <Icon size={16} />
                 <span className="flex-1">{label}</span>
               </NavLink>
             ))}
           </div>
-
           <div className="px-3 pt-4 border-t border-border mt-2">
             <div className="flex items-center gap-2.5 px-2 py-2">
               <div className="w-7 h-7 bg-gradient-to-br from-violet-500 to-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -120,7 +106,6 @@ export function Layout() {
           </div>
         </aside>
 
-        {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           <div className="border-b border-border overflow-hidden bg-bg-2">
             <LiveTicker />
