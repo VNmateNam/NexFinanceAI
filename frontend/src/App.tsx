@@ -15,7 +15,6 @@ import api from './services/api';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, _hydrated } = useAuthStore();
-
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
@@ -27,69 +26,46 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+async function loadUserProfile(userId: string, email: string, fullName: string, createdAt: string) {
+  try {
+    const profile = await api.get('/api/auth/me').then(r => r.data.data);
+    return profile;
+  } catch {
+    return { id: userId, email, full_name: fullName, plan: 'free', is_admin: false, created_at: createdAt };
+  }
+}
+
 export default function App() {
   const { fetchAll, jitterPrices } = useMarketStore();
   const { setUser, setHydrated, logout } = useAuthStore();
 
   useEffect(() => {
-    // Timeout: never block UI more than 2 seconds
+    // Hard timeout — never spin more than 3s
     const timeout = setTimeout(() => {
-      console.log('[App] auth timeout — showing login');
+      console.warn('[App] auth timeout — forcing hydration');
+      logout();
       setHydrated();
-    }, 2000);
+    }, 3000);
 
-    // Get current session immediately (synchronous check)
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) console.error('[App] getSession error:', error.message);
-      console.log('[App] session on load:', session ? `user=${session.user.email}` : 'none');
-
-      if (session?.user) {
-        // Fetch backend profile
-        api.get('/api/auth/me')
-          .then(r => {
-            setUser(r.data.data);
-            clearTimeout(timeout);
-            setHydrated();
-          })
-          .catch(() => {
-            // Backend unavailable — use Supabase user data
-            setUser({
-              id: session.user.id,
-              email: session.user.email ?? '',
-              full_name: session.user.user_metadata?.full_name ?? '',
-              plan: 'free',
-              is_admin: false,
-              created_at: session.user.created_at ?? '',
-            });
-            clearTimeout(timeout);
-            setHydrated();
-          });
-      } else {
-        logout();
-        clearTimeout(timeout);
-        setHydrated();
-      }
-    });
-
-    // Also listen for future auth changes (login / logout / token refresh)
+    // onAuthStateChange handles ALL cases including page refresh
+    // INITIAL_SESSION fires immediately on page load with the stored session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('[App] auth event:', event, session?.user?.email ?? 'no user');
+        console.log('[App] auth event:', event, '| user:', session?.user?.email ?? 'none');
+        clearTimeout(timeout);
 
-        // SIGNED_IN fires after signInWithPassword succeeds
-        if (event === 'SIGNED_IN' && session?.user) {
-          try {
-            const profile = await api.get('/api/auth/me').then(r => r.data.data);
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            const profile = await loadUserProfile(
+              session.user.id,
+              session.user.email ?? '',
+              session.user.user_metadata?.full_name ?? '',
+              session.user.created_at ?? ''
+            );
             setUser(profile);
-          } catch {
-            setUser({
-              id: session.user.id,
-              email: session.user.email ?? '',
-              full_name: session.user.user_metadata?.full_name ?? '',
-              plan: 'free',
-              is_admin: false,
-              created_at: session.user.created_at ?? '',
-            });
+          } else {
+            // INITIAL_SESSION with no session = not logged in
+            logout();
           }
           setHydrated();
         }
@@ -98,15 +74,13 @@ export default function App() {
           logout();
           setHydrated();
         }
-
-        if (event === 'TOKEN_REFRESHED' && session?.user) {
-          // Token silently refreshed — no action needed, interceptor picks it up
-          console.log('[App] token refreshed silently');
-        }
       }
     );
 
-    return () => { clearTimeout(timeout); subscription.unsubscribe(); };
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
