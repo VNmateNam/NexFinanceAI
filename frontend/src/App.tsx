@@ -26,52 +26,56 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-async function loadUserProfile(userId: string, email: string, fullName: string, createdAt: string) {
-  try {
-    const profile = await api.get('/api/auth/me').then(r => r.data.data);
-    return profile;
-  } catch {
-    return { id: userId, email, full_name: fullName, plan: 'free', is_admin: false, created_at: createdAt };
-  }
-}
-
 export default function App() {
   const { fetchAll, jitterPrices } = useMarketStore();
   const { setUser, setHydrated, logout } = useAuthStore();
 
   useEffect(() => {
-    // Hard timeout — never spin more than 3s
+    // Hard timeout — never spin more than 2 seconds no matter what
     const timeout = setTimeout(() => {
       console.warn('[App] auth timeout — forcing hydration');
       logout();
       setHydrated();
-    }, 3000);
+    }, 2000);
 
-    // onAuthStateChange handles ALL cases including page refresh
-    // INITIAL_SESSION fires immediately on page load with the stored session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[App] auth event:', event, '| user:', session?.user?.email ?? 'none');
-        clearTimeout(timeout);
 
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (
+          event === 'INITIAL_SESSION' ||
+          event === 'SIGNED_IN' ||
+          event === 'TOKEN_REFRESHED'
+        ) {
           if (session?.user) {
-            const profile = await loadUserProfile(
-              session.user.id,
-              session.user.email ?? '',
-              session.user.user_metadata?.full_name ?? '',
-              session.user.created_at ?? ''
-            );
-            setUser(profile);
+            // ── CRITICAL: call setHydrated IMMEDIATELY so spinner clears ──
+            // Then fetch profile in background — UI is unblocked either way
+            setUser({
+              id: session.user.id,
+              email: session.user.email ?? '',
+              full_name: session.user.user_metadata?.full_name ?? '',
+              plan: 'free',
+              is_admin: false,
+              created_at: session.user.created_at ?? '',
+            });
+            clearTimeout(timeout);
+            setHydrated();   // ← unblocks spinner NOW, before any async calls
+
+            // Then enrich with backend profile in background (non-blocking)
+            api.get('/api/auth/me')
+              .then(r => { if (r.data.data) setUser(r.data.data); })
+              .catch(() => { /* keep Supabase data */ });
           } else {
-            // INITIAL_SESSION with no session = not logged in
+            // No session (INITIAL_SESSION with null = not logged in)
             logout();
+            clearTimeout(timeout);
+            setHydrated();
           }
-          setHydrated();
         }
 
         if (event === 'SIGNED_OUT') {
           logout();
+          clearTimeout(timeout);
           setHydrated();
         }
       }
