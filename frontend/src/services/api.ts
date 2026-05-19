@@ -75,4 +75,9 @@ export const adminApi = {
     api.patch(`/api/admin/users/${id}/plan`, { plan }).then(r => r.data.data),
 };
 
+export const stripeApi = {
+  createCheckoutSession: () => api.post('/api/stripe/create-checkout-session').then(r => r.data),
+  createPortalSession: () => api.post('/api/stripe/create-portal-session').then(r => r.data),
+};
+
 export default api;

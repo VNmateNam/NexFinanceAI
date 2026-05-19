@@ -13,8 +13,8 @@ import { alertsRouter } from './routes/alerts';
 import { portfolioRouter } from './routes/portfolio';
 import { authRouter } from './routes/auth';
 import { adminRouter } from './routes/admin';
+import { stripeRouter, stripeWebhookHandler } from './routes/stripe';
 import { checkAlerts } from './services/alertChecker';
-import { refreshPriceCache } from './services/priceService';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -70,6 +70,10 @@ app.use('/api/ai', aiRouter);
 app.use('/api/alerts', alertsRouter);
 app.use('/api/portfolio', portfolioRouter);
 app.use('/api/admin', adminRouter);
+
+// Stripe webhook needs raw body — register BEFORE express.json is applied to this path
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
+app.use('/api/stripe', stripeRouter);
 
 // ── Health ────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {

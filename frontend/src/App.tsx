@@ -8,13 +8,15 @@ import { Alerts } from './pages/Alerts';
 import { AIChat } from './pages/AIChat';
 import { Admin } from './pages/Admin';
 import { Login } from './pages/Login';
+import { SignUp } from './pages/SignUp';
+import { Settings } from './pages/Settings';
 import { useMarketStore } from './store/marketStore';
 import { useAuthStore } from './store/authStore';
 import { supabase } from './services/supabase';
 import api from './services/api';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, _hydrated } = useAuthStore();
+function ProtectedRoute({ children, adminOnly }: { children: React.ReactNode; adminOnly?: boolean }) {
+  const { isAuthenticated, user, _hydrated } = useAuthStore();
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
@@ -23,6 +25,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (adminOnly && !user?.is_admin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -31,52 +34,48 @@ export default function App() {
   const { setUser, setHydrated, logout } = useAuthStore();
 
   useEffect(() => {
-    // Hard timeout — never spin more than 2 seconds no matter what
+    // Since persistSession=false, on mount there's no stored session.
+    // We just need to mark hydrated so the spinner clears immediately.
     const timeout = setTimeout(() => {
-      console.warn('[App] auth timeout — forcing hydration');
-      logout();
       setHydrated();
-    }, 2000);
+    }, 500);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[App] auth event:', event, '| user:', session?.user?.email ?? 'none');
 
-        if (
-          event === 'INITIAL_SESSION' ||
-          event === 'SIGNED_IN' ||
-          event === 'TOKEN_REFRESHED'
-        ) {
-          if (session?.user) {
-            // ── CRITICAL: call setHydrated IMMEDIATELY so spinner clears ──
-            // Then fetch profile in background — UI is unblocked either way
-            setUser({
-              id: session.user.id,
-              email: session.user.email ?? '',
-              full_name: session.user.user_metadata?.full_name ?? '',
-              plan: 'free',
-              is_admin: false,
-              created_at: session.user.created_at ?? '',
-            });
-            clearTimeout(timeout);
-            setHydrated();   // ← unblocks spinner NOW, before any async calls
+        if (event === 'SIGNED_IN' && session?.user) {
+          clearTimeout(timeout);
+          // Set basic user info immediately to unblock UI
+          setUser({
+            id: session.user.id,
+            email: session.user.email ?? '',
+            full_name: session.user.user_metadata?.full_name ?? '',
+            plan: 'free',
+            is_admin: false,
+            created_at: session.user.created_at ?? '',
+          });
+          setHydrated();
 
-            // Then enrich with backend profile in background (non-blocking)
-            api.get('/api/auth/me')
-              .then(r => { if (r.data.data) setUser(r.data.data); })
-              .catch(() => { /* keep Supabase data */ });
-          } else {
-            // No session (INITIAL_SESSION with null = not logged in)
-            logout();
-            clearTimeout(timeout);
-            setHydrated();
-          }
+          // Enrich with real profile from backend
+          api.get('/api/auth/me')
+            .then(r => { if (r.data.data) setUser(r.data.data); })
+            .catch(() => { /* keep Supabase data */ });
         }
 
         if (event === 'SIGNED_OUT') {
-          logout();
           clearTimeout(timeout);
+          logout();
           setHydrated();
+        }
+
+        if (event === 'INITIAL_SESSION') {
+          // With persistSession=false this always fires with null session
+          if (!session) {
+            clearTimeout(timeout);
+            logout();
+            setHydrated();
+          }
         }
       }
     );
@@ -97,6 +96,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<SignUp />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
@@ -104,7 +104,8 @@ export default function App() {
         <Route path="portfolio" element={<Portfolio />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="ai" element={<AIChat />} />
-        <Route path="admin" element={<Admin />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

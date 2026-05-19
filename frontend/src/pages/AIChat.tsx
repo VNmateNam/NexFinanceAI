@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, Send, Zap, RefreshCw, Cloud, Key } from 'lucide-react';
+import { Bot, Send, Zap, RefreshCw, Lock, Crown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useMarketStore } from '../store/marketStore';
 import { useAuthStore } from '../store/authStore';
 import { aiApi } from '../services/api';
@@ -66,15 +67,38 @@ const SYSTEM = (ctx: string) =>
   `You are NexusAI, an expert AI financial assistant for Gold, Silver, Oil and equities.\n\n${ctx}\n\nBe concise, data-driven, actionable. Use **bold** for key numbers. Add brief risk disclaimers. Never guarantee returns.`;
 
 export function AIChat() {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const isPro = user?.plan === 'pro' || user?.plan === 'enterprise';
+
+  if (!isPro) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-16 h-16 bg-gold/10 border border-gold/20 rounded-2xl flex items-center justify-center mb-4">
+          <Lock size={28} className="text-gold" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Pro Feature</h2>
+        <p className="text-gray-400 text-sm mb-6 max-w-sm">
+          AI Financial Assistant is available on the Pro plan. Upgrade to get access to Claude AI with live market context.
+        </p>
+        <button onClick={() => navigate('/settings')}
+          className="btn-primary flex items-center gap-2 px-6 py-2.5">
+          <Crown size={14} /> Upgrade to Pro — $20/mo
+        </button>
+        <p className="text-xs text-gray-600 mt-2">Sandbox mode · card 4242 4242 4242 4242</p>
+      </div>
+    );
+  }
+
+  return <AIChatContent />;
+}
+
+function AIChatContent() {
   const { commodities, stocks } = useMarketStore();
-  const { isAuthenticated } = useAuthStore();
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input,    setInput]    = useState('');
   const [loading,  setLoading]  = useState(false);
-  // Direct Anthropic key — only needed when not authenticated with backend
-  const [apiKey,   setApiKey]   = useState(() => localStorage.getItem('nexusai_anthropic_key') || '');
-  const [showKey,  setShowKey]  = useState(false);
   const endRef   = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -88,14 +112,14 @@ export function AIChat() {
       const oil  = commodities.find(c => c.symbol === 'WTI');
       setMessages([{
         id: 'welcome', role: 'assistant',
-        content: `Hello! I'm NexusAI — your AI financial assistant.\n\nLive data I can see:\n**Gold (XAU):** $${(gold?.price??3327.40).toLocaleString()} (${(gold?.change_pct??1.24)>=0?'+':''}${(gold?.change_pct??1.24).toFixed(2)}%)\n**WTI Oil:** $${(oil?.price??62.18).toFixed(2)} (${(oil?.change_pct??-0.41).toFixed(2)}%)\n\nAsk me anything about markets, predictions, or investment strategy!\n\n${isAuthenticated ? '✅ Connected to backend — full AI powered by Claude.' : '⚠️ Not logged in. Paste your Anthropic API key below for AI responses.'}`,
+        content: `Hello! I'm NexusAI — your AI financial assistant.\n\nLive data I can see:\n**Gold (XAU):** $${(gold?.price??3327.40).toLocaleString()} (${(gold?.change_pct??1.24)>=0?'+':''}${(gold?.change_pct??1.24).toFixed(2)}%)\n**WTI Oil:** $${(oil?.price??62.18).toFixed(2)} (${(oil?.change_pct??-0.41).toFixed(2)}%)\n\nAsk me anything about markets, predictions, or investment strategy!`,
       }]);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
-  const saveKey = (k: string) => { setApiKey(k); localStorage.setItem('nexusai_anthropic_key', k); };
+  const saveKey = (_k: string) => {};  // no-op, kept for compat
 
   const send = useCallback(async (text?: string) => {
     const content = (text ?? input).trim();
@@ -109,45 +133,13 @@ export function AIChat() {
     localChat.append({ role: 'user', content });
 
     try {
-      let reply: string;
-
-      if (isAuthenticated) {
-        // ── Use backend (full Claude, no key needed in browser) ──
-        reply = await aiApi.chat(history.slice(-10).map(({ role, content }) => ({ role, content })));
-      } else if (apiKey) {
-        // ── Direct Anthropic call (user provides own key) ────────
-        const ctx = buildContext(commodities, stocks);
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 500,
-            system: SYSTEM(ctx),
-            messages: history.slice(-10).map(({ role, content }) => ({ role, content })),
-          }),
-        });
-        if (!resp.ok) {
-          const e = await resp.json().catch(() => ({}));
-          throw new Error(e?.error?.message || `API ${resp.status}`);
-        }
-        const d = await resp.json();
-        reply = d.content?.[0]?.text ?? 'No response.';
-      } else {
-        reply = '⚠️ **Not connected.**\n\nTo use AI chat, either:\n1. **Login** to use the backend AI (recommended)\n2. Paste your Anthropic API key in the field below';
-      }
-
+      const reply = await aiApi.chat(history.slice(-10).map(({ role, content }) => ({ role, content })));
       const replyMsg: Msg = { id: `r-${Date.now()}`, role: 'assistant', content: reply };
       setMessages(prev => [...prev, replyMsg]);
       localChat.append({ role: 'assistant', content: reply });
     } catch (err: any) {
       const errContent = err.message?.includes('401')
-        ? '❌ Invalid API key. Check your Anthropic key.'
+        ? '❌ Session expired. Please sign in again.'
         : err.message?.includes('429')
         ? '⚠️ Rate limit. Wait a moment and try again.'
         : `❌ Error: ${err.message}`;
@@ -156,7 +148,7 @@ export function AIChat() {
 
     setLoading(false);
     inputRef.current?.focus();
-  }, [input, loading, messages, isAuthenticated, apiKey, commodities, stocks]);
+  }, [input, loading, messages]);
 
   function clearChat() {
     localChat.clear();
@@ -182,18 +174,12 @@ export function AIChat() {
               </div>
               <div>
                 <p className="text-sm font-bold">NexusAI Assistant</p>
-                <p className="text-[10px] text-gray-500">
-                  {isAuthenticated ? 'Backend AI · Claude Sonnet' : apiKey ? 'Direct API · Claude Haiku' : 'No AI connected'}
-                </p>
+                <p className="text-[10px] text-gray-500">Claude AI · live market context</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {isAuthenticated
-                ? <><span className="w-1.5 h-1.5 bg-green-400 rounded-full live-dot"/><span className="text-xs text-green-400 font-mono">Backend</span></>
-                : apiKey
-                ? <><span className="w-1.5 h-1.5 bg-yellow-400 rounded-full live-dot"/><span className="text-xs text-yellow-400 font-mono">Direct API</span></>
-                : <span className="text-xs text-gray-500 font-mono">Login or add key</span>
-              }
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full live-dot"/>
+              <span className="text-xs text-green-400 font-mono">Connected</span>
               <button onClick={clearChat} className="btn-ghost text-xs ml-1 flex items-center gap-1">
                 <RefreshCw size={11}/> Clear
               </button>
@@ -217,7 +203,7 @@ export function AIChat() {
 
           <div className="flex gap-2 mt-2 flex-shrink-0">
             <input ref={inputRef} className="input flex-1"
-              placeholder={isAuthenticated ? 'Ask about gold, oil, stocks…' : apiKey ? 'Ask anything…' : 'Login or add API key to chat…'}
+              placeholder="Ask about gold, oil, stocks…"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
@@ -227,26 +213,6 @@ export function AIChat() {
               <Send size={14} />
             </button>
           </div>
-
-          {/* Only show key input when not authenticated */}
-          {!isAuthenticated && (
-            <div className="mt-2 flex-shrink-0">
-              <div className="flex gap-2 items-center">
-                <Key size={12} className="text-gray-600 flex-shrink-0" />
-                <input className="input flex-1 text-xs font-mono" type={showKey ? 'text' : 'password'}
-                  placeholder="Anthropic API key (sk-ant-…) — stored in browser only"
-                  value={apiKey} onChange={e => saveKey(e.target.value)} />
-                <button onClick={() => setShowKey(s => !s)} className="btn-ghost text-xs flex-shrink-0 px-2">
-                  {showKey ? '🙈' : '👁️'}
-                </button>
-              </div>
-              {!apiKey && (
-                <p className="text-[10px] text-gray-600 mt-1 pl-4">
-                  Login to use the backend AI, or get a free key at <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" className="text-gold underline">console.anthropic.com</a>
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Right panel */}

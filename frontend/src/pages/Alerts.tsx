@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell, Trash2, ToggleLeft, ToggleRight,
-  CheckCircle2, Plus, Cloud, HardDrive, AlertCircle
+  CheckCircle2, Plus, Cloud, HardDrive, AlertCircle, Lock, Crown
 } from 'lucide-react';
 import type { PriceAlert, AlertHistoryItem } from '../types';
 import { alertsApi } from '../services/api';
@@ -84,6 +85,34 @@ function validate(form: any): FormErrors {
 }
 
 export function Alerts() {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const isPro = user?.plan === 'pro' || user?.plan === 'enterprise';
+
+  // Pro gate — shown BEFORE the inner component (which has all hooks)
+  if (!isPro) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-16 h-16 bg-gold/10 border border-gold/20 rounded-2xl flex items-center justify-center mb-4">
+          <Lock size={28} className="text-gold" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Pro Feature</h2>
+        <p className="text-gray-400 text-sm mb-6 max-w-sm">
+          Price Alerts are available on the Pro plan. Upgrade to set alerts for Gold, Oil, Stocks and get notified instantly.
+        </p>
+        <button onClick={() => navigate('/settings')}
+          className="btn-primary flex items-center gap-2 px-6 py-2.5">
+          <Crown size={14} /> Upgrade to Pro — $20/mo
+        </button>
+        <p className="text-xs text-gray-600 mt-2">Sandbox mode · card 4242 4242 4242 4242</p>
+      </div>
+    );
+  }
+
+  return <AlertsContent />;
+}
+
+function AlertsContent() {
   const { isAuthenticated } = useAuthStore();
 
   // ── Load from localStorage SYNCHRONOUSLY on first render ─────

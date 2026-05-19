@@ -45,3 +45,17 @@ authRouter.get('/me', requireAuth, async (req: AuthRequest, res: Response) => {
     .from('profiles').select('*').eq('id', req.user!.id).single();
   res.json({ success: true, data: profile });
 });
+
+// PATCH /api/auth/me — update full_name
+authRouter.patch('/me', requireAuth, async (req: AuthRequest, res: Response) => {
+  const { full_name } = req.body;
+  if (!full_name?.trim()) return res.status(400).json({ error: 'full_name required' });
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ full_name: full_name.trim(), updated_at: new Date().toISOString() })
+    .eq('id', req.user!.id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, data });
+});
