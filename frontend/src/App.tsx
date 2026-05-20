@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
@@ -32,6 +32,18 @@ function ProtectedRoute({ children, adminOnly }: { children: React.ReactNode; ad
 export default function App() {
   const { fetchAll, jitterPrices } = useMarketStore();
   const { setUser, setHydrated, logout } = useAuthStore();
+
+  // Re-fetch profile from backend (called after Stripe return, focus, etc.)
+  const refreshProfile = useCallback(async () => {
+    try {
+      const r = await api.get('/api/auth/me');
+      if (r.data.data) {
+        useAuthStore.getState().setUser(r.data.data);
+      }
+    } catch {
+      // Not authenticated — ignore
+    }
+  }, []);
 
   useEffect(() => {
     // Since persistSession=false, on mount there's no stored session.
@@ -85,6 +97,25 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Re-fetch profile when window gets focus (handles Stripe return, other tab changes)
+  useEffect(() => {
+    const onFocus = () => {
+      const { isAuthenticated } = useAuthStore.getState();
+      if (isAuthenticated) refreshProfile();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refreshProfile]);
+
+  // Handle Stripe return — ?upgraded=1 triggers immediate plan refresh
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgraded') === '1') {
+      const t = setTimeout(refreshProfile, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [refreshProfile]);
 
   useEffect(() => {
     fetchAll();

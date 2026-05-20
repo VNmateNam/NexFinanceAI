@@ -21,16 +21,16 @@
 
 @layer components {
   .card {
-    @apply bg-bg-2 border border-border rounded-xl p-5;
+    @apply bg-bg-2 border border-border rounded-xl p-4 sm:p-5;
   }
   .card-sm {
-    @apply bg-bg-2 border border-border rounded-xl p-4;
+    @apply bg-bg-2 border border-border rounded-xl p-3 sm:p-4;
   }
   .btn-primary {
-    @apply bg-gold text-bg font-bold px-5 py-2.5 rounded-lg text-sm transition-all hover:bg-gold-dark active:scale-95;
+    @apply bg-gold text-bg font-bold px-4 sm:px-5 py-2.5 rounded-lg text-sm transition-all hover:bg-gold-dark active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-outline {
-    @apply border border-border-light text-gray-400 font-semibold px-4 py-2 rounded-lg text-sm transition-all hover:border-gold hover:text-gold;
+    @apply border border-border-light text-gray-400 font-semibold px-3 sm:px-4 py-2 rounded-lg text-sm transition-all hover:border-gold hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-ghost {
     @apply text-gray-400 font-medium px-3 py-1.5 rounded-lg text-sm transition-all hover:bg-bg-4 hover:text-white;
@@ -52,8 +52,8 @@
   .up { @apply text-green-400; }
   .down { @apply text-red-400; }
 
-  .page-title { @apply text-2xl font-extrabold tracking-tight mb-1; }
-  .page-sub { @apply text-sm text-gray-400 mb-5; }
+  .page-title { @apply text-xl sm:text-2xl font-extrabold tracking-tight mb-1; }
+  .page-sub { @apply text-sm text-gray-400 mb-4 sm:mb-5; }
   .section-label { @apply text-xs font-bold tracking-widest text-gray-600 uppercase; }
 }
 

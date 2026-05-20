@@ -57,15 +57,6 @@ function Typing() {
   );
 }
 
-function buildContext(commodities: any[], stocks: any[]) {
-  const fmt = (p: any) => `${p.name} (${p.symbol}): $${p.price.toLocaleString(undefined,{maximumFractionDigits:2})} (${p.change_pct>=0?'+':''}${p.change_pct.toFixed(2)}%)`;
-  return ['LIVE MARKET DATA:', ...commodities.map(fmt), '', 'STOCKS:', ...stocks.map(fmt),
-    '', 'MACRO: Fed Rate 5.25% | USD DXY 104.2 | VIX 18.4 | US10Y 4.62%'].join('\n');
-}
-
-const SYSTEM = (ctx: string) =>
-  `You are NexusAI, an expert AI financial assistant for Gold, Silver, Oil and equities.\n\n${ctx}\n\nBe concise, data-driven, actionable. Use **bold** for key numbers. Add brief risk disclaimers. Never guarantee returns.`;
-
 export function AIChat() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -94,7 +85,7 @@ export function AIChat() {
 }
 
 function AIChatContent() {
-  const { commodities, stocks } = useMarketStore();
+  const { commodities } = useMarketStore();
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input,    setInput]    = useState('');
