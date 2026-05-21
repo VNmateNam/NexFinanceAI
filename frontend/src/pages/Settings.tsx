@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Lock, Eye, EyeOff, Check, Crown, CreditCard, Zap, Sparkles } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Check, Crown, CreditCard, Zap, Sparkles, Shield } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../store/authStore';

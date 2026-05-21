@@ -85,7 +85,7 @@ export function AIChat() {
 }
 
 function AIChatContent() {
-  const { commodities } = useMarketStore();
+  const { commodities, stocks } = useMarketStore();
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input,    setInput]    = useState('');
@@ -148,7 +148,7 @@ function AIChatContent() {
 
   const gold = commodities.find(c => c.symbol === 'XAU');
   const oil  = commodities.find(c => c.symbol === 'WTI');
-  const nvda = stocks.find(s => s.symbol === 'NVDA');
+  const nvda = stocks.find((s: any) => s.symbol === 'NVDA');
 
   return (
     <div>
