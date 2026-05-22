@@ -29,9 +29,14 @@ interface PriceChartProps {
 }
 
 export function PriceAreaChart({ data, color = '#f5c842', height = 220, prefix = '$' }: PriceChartProps) {
+  // Filter out any points where price is NaN/null/undefined
+  const safeData = data.filter(d => d.price != null && isFinite(Number(d.price)));
+  if (safeData.length === 0) {
+    return <div style={{ height }} className="flex items-center justify-center text-gray-600 text-xs">No data</div>;
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+      <AreaChart data={safeData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={color} stopOpacity={0.15} />
@@ -105,12 +110,21 @@ interface DonutProps {
 }
 
 export function DonutChart({ data, height = 220, innerRadius = 60 }: DonutProps) {
+  // Filter out zero/NaN values that cause SVG path errors
+  const safeData = data.filter(d => d.value != null && isFinite(d.value) && d.value > 0);
+  if (safeData.length === 0) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center text-gray-600 text-xs">
+        No data
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
       <PieChart>
-        <Pie data={data} cx="50%" cy="50%" innerRadius={innerRadius} outerRadius={90}
+        <Pie data={safeData} cx="50%" cy="50%" innerRadius={innerRadius} outerRadius={90}
           paddingAngle={3} dataKey="value">
-          {data.map((entry, i) => <Cell key={i} fill={entry.color} stroke="transparent" />)}
+          {safeData.map((entry, i) => <Cell key={i} fill={entry.color} stroke="transparent" />)}
         </Pie>
         <Tooltip
           contentStyle={{ background: '#1e1f28', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: 12 }}

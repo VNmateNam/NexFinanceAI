@@ -40,10 +40,21 @@ export function Settings() {
   // Detect Stripe return
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+
     if (params.get('upgraded') === '1') {
+      // Clean URL immediately
+      navigate('/settings', { replace: true });
+      sessionStorage.removeItem('stripe_upgrade_pending');
       setUpgradedBanner(true);
+
+      // If already pro (webhook was fast), just show success
+      if (isPro) {
+        setRefreshing(false);
+        return;
+      }
+
+      // Otherwise poll until plan updates
       setRefreshing(true);
-      // Poll for plan update — webhook may take a few seconds
       let attempts = 0;
       const poll = setInterval(async () => {
         attempts++;
@@ -57,13 +68,41 @@ export function Settings() {
             }
           }
         } catch {}
-        if (attempts >= 8) { setRefreshing(false); clearInterval(poll); }
+        if (attempts >= 10) { setRefreshing(false); clearInterval(poll); }
       }, 1500);
-      // Clean URL
-      navigate('/settings', { replace: true });
+      return () => clearInterval(poll);
     }
+
     if (params.get('cancelled') === '1') {
       navigate('/settings', { replace: true });
+    }
+
+    // Check if we just came back from Stripe via re-login flow
+    const pending = sessionStorage.getItem('stripe_upgrade_pending');
+    if (pending && !isPro) {
+      setUpgradedBanner(true);
+      setRefreshing(true);
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const r = await api.get('/api/auth/me');
+          if (r.data.data) {
+            setUser(r.data.data);
+            if (r.data.data.plan === 'pro' || r.data.data.plan === 'enterprise') {
+              sessionStorage.removeItem('stripe_upgrade_pending');
+              setRefreshing(false);
+              clearInterval(poll);
+            }
+          }
+        } catch {}
+        if (attempts >= 10) {
+          sessionStorage.removeItem('stripe_upgrade_pending');
+          setRefreshing(false);
+          clearInterval(poll);
+        }
+      }, 1500);
+      return () => clearInterval(poll);
     }
   }, []);
 
@@ -108,6 +147,8 @@ export function Settings() {
     setStripeLoading(true); setStripeError('');
     try {
       const r = await api.post('/api/stripe/create-checkout-session');
+      // Flag so App.tsx knows to poll for plan upgrade after login on return
+      sessionStorage.setItem('stripe_upgrade_pending', '1');
       window.location.href = r.data.url;
     } catch (e: any) {
       setStripeError(e?.response?.data?.error || 'Failed to start checkout. Please try again.');

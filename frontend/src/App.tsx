@@ -45,6 +45,28 @@ export default function App() {
     }
   }, []);
 
+  // Poll until plan becomes 'pro' — used after Stripe checkout
+  const pollForUpgrade = useCallback(() => {
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts++;
+      try {
+        const r = await api.get('/api/auth/me');
+        if (r.data.data) {
+          useAuthStore.getState().setUser(r.data.data);
+          if (r.data.data.plan === 'pro' || r.data.data.plan === 'enterprise') {
+            sessionStorage.removeItem('stripe_upgrade_pending');
+            clearInterval(interval);
+          }
+        }
+      } catch {}
+      if (attempts >= 10) {
+        clearInterval(interval);
+        sessionStorage.removeItem('stripe_upgrade_pending');
+      }
+    }, 2000);
+  }, []);
+
   useEffect(() => {
     // Since persistSession=false, on mount there's no stored session.
     // We just need to mark hydrated so the spinner clears immediately.
@@ -69,9 +91,22 @@ export default function App() {
           });
           setHydrated();
 
+          // Check if returning from Stripe (flag set before redirect)
+          const pendingUpgrade = sessionStorage.getItem('stripe_upgrade_pending');
+
           // Enrich with real profile from backend
           api.get('/api/auth/me')
-            .then(r => { if (r.data.data) setUser(r.data.data); })
+            .then(r => {
+              if (r.data.data) {
+                setUser(r.data.data);
+                // If upgrade is pending but plan not yet updated, poll
+                if (pendingUpgrade && r.data.data.plan !== 'pro' && r.data.data.plan !== 'enterprise') {
+                  pollForUpgrade();
+                } else if (pendingUpgrade) {
+                  sessionStorage.removeItem('stripe_upgrade_pending');
+                }
+              }
+            })
             .catch(() => { /* keep Supabase data */ });
         }
 

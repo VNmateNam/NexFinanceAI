@@ -58,10 +58,24 @@ export function Portfolio() {
     pnl_pct: safe(p.pnl_pct),
   }));
 
-  const totalVal = safe(displaySummary.total_value, 1);
-  const pieData = safePositions.map(p => ({
-    name: p.name, value: Math.round((safe(p.market_value) / totalVal) * 100), color: p.color,
+  // Guard pie data — only include positions with real market value > 0
+  const validPositions = safePositions.filter(p => safe(p.market_value) > 0);
+  const totalVal = validPositions.reduce((sum, p) => sum + safe(p.market_value), 0) || 1;
+  const pieData = validPositions.map(p => ({
+    name: p.name,
+    value: Math.max(1, Math.round((safe(p.market_value) / totalVal) * 100)),
+    color: p.color || '#f5c842',
   }));
+
+  // Generate performance data with valid numbers only
+  const PERF_DATA = Array.from({ length: 90 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (90 - i));
+    const base = safe(displaySummary.total_cost, 100000);
+    return {
+      date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      price: Math.round(base * (0.95 + (i / 90) * 0.15 + (Math.random() - 0.5) * 0.02)),
+    };
+  });
 
   async function addPosition() {
     if (!form.symbol || !form.name || !form.quantity || !form.avg_cost) return;
@@ -86,11 +100,6 @@ export function Portfolio() {
       setPositions(prev => prev.filter(p => p.id !== id));
     }
   }
-
-  const PERF_DATA = Array.from({ length: 90 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (90 - i));
-    return { date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), price: 115000 + Math.random() * 500 * i };
-  });
 
   if (fetching) {
     return (

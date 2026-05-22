@@ -40,7 +40,9 @@ export function Login() {
     }
 
     console.log('[Login] success, session:', data.session?.user?.email);
-    navigate('/dashboard', { replace: true });
+    // If returning from Stripe checkout, go to settings where the upgrade banner + poll lives
+    const pendingUpgrade = sessionStorage.getItem('stripe_upgrade_pending');
+    navigate(pendingUpgrade ? '/settings' : '/dashboard', { replace: true });
     setLoading(false);
   }
 
