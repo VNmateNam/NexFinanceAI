@@ -45,7 +45,7 @@ export default function App() {
     }
   }, []);
 
-  // Poll until plan becomes 'pro' — used after Stripe checkout
+  // Poll until plan becomes 'pro' — used after Stripe checkout (triggered from SIGNED_IN handler)
   const pollForUpgrade = useCallback(() => {
     let attempts = 0;
     const interval = setInterval(async () => {
@@ -60,7 +60,7 @@ export default function App() {
           }
         }
       } catch {}
-      if (attempts >= 10) {
+      if (attempts >= 12) {
         clearInterval(interval);
         sessionStorage.removeItem('stripe_upgrade_pending');
       }
@@ -68,19 +68,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Since persistSession=false, on mount there's no stored session.
-    // We just need to mark hydrated so the spinner clears immediately.
     const timeout = setTimeout(() => {
+      // Safety net — if nothing fires in 3s, mark hydrated
       setHydrated();
-    }, 500);
+    }, 3000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[App] auth event:', event, '| user:', session?.user?.email ?? 'none');
 
-        if (event === 'SIGNED_IN' && session?.user) {
+        if (
+          (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
+          && session?.user
+        ) {
           clearTimeout(timeout);
-          // Set basic user info immediately to unblock UI
+          // Set basic user info immediately so UI unblocks
           setUser({
             id: session.user.id,
             email: session.user.email ?? '',
@@ -91,18 +93,19 @@ export default function App() {
           });
           setHydrated();
 
-          // Check if returning from Stripe (flag set before redirect)
+          // Check if returning from Stripe
           const pendingUpgrade = sessionStorage.getItem('stripe_upgrade_pending');
 
-          // Enrich with real profile from backend
+          // Enrich with real profile from backend (has plan, is_admin, etc.)
           api.get('/api/auth/me')
             .then(r => {
               if (r.data.data) {
                 setUser(r.data.data);
-                // If upgrade is pending but plan not yet updated, poll
+                // If upgrade pending but plan not yet updated, start polling
                 if (pendingUpgrade && r.data.data.plan !== 'pro' && r.data.data.plan !== 'enterprise') {
                   pollForUpgrade();
                 } else if (pendingUpgrade) {
+                  // Already updated — just clean up the flag
                   sessionStorage.removeItem('stripe_upgrade_pending');
                 }
               }
@@ -110,19 +113,17 @@ export default function App() {
             .catch(() => { /* keep Supabase data */ });
         }
 
-        if (event === 'SIGNED_OUT') {
+        if (event === 'INITIAL_SESSION' && !session) {
+          // No stored session — user must log in
           clearTimeout(timeout);
           logout();
           setHydrated();
         }
 
-        if (event === 'INITIAL_SESSION') {
-          // With persistSession=false this always fires with null session
-          if (!session) {
-            clearTimeout(timeout);
-            logout();
-            setHydrated();
-          }
+        if (event === 'SIGNED_OUT') {
+          clearTimeout(timeout);
+          logout();
+          setHydrated();
         }
       }
     );
@@ -133,7 +134,7 @@ export default function App() {
     };
   }, []);
 
-  // Re-fetch profile when window gets focus (handles Stripe return, other tab changes)
+  // Re-fetch profile when window gets focus (covers edge cases like manual plan changes)
   useEffect(() => {
     const onFocus = () => {
       const { isAuthenticated } = useAuthStore.getState();
@@ -141,15 +142,6 @@ export default function App() {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [refreshProfile]);
-
-  // Handle Stripe return — ?upgraded=1 triggers immediate plan refresh
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('upgraded') === '1') {
-      const t = setTimeout(refreshProfile, 2500);
-      return () => clearTimeout(t);
-    }
   }, [refreshProfile]);
 
   useEffect(() => {

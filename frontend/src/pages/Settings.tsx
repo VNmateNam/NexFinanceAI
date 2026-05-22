@@ -42,19 +42,12 @@ export function Settings() {
     const params = new URLSearchParams(location.search);
 
     if (params.get('upgraded') === '1') {
-      // Clean URL immediately
       navigate('/settings', { replace: true });
       sessionStorage.removeItem('stripe_upgrade_pending');
       setUpgradedBanner(true);
-
-      // If already pro (webhook was fast), just show success
-      if (isPro) {
-        setRefreshing(false);
-        return;
-      }
-
-      // Otherwise poll until plan updates
       setRefreshing(true);
+
+      // Always poll — isPro from store may not reflect backend yet at mount time
       let attempts = 0;
       const poll = setInterval(async () => {
         attempts++;
@@ -65,21 +58,23 @@ export function Settings() {
             if (r.data.data.plan === 'pro' || r.data.data.plan === 'enterprise') {
               setRefreshing(false);
               clearInterval(poll);
+              return;
             }
           }
         } catch {}
-        if (attempts >= 10) { setRefreshing(false); clearInterval(poll); }
+        if (attempts >= 12) { setRefreshing(false); clearInterval(poll); }
       }, 1500);
       return () => clearInterval(poll);
     }
 
     if (params.get('cancelled') === '1') {
       navigate('/settings', { replace: true });
+      return;
     }
 
-    // Check if we just came back from Stripe via re-login flow
+    // Re-login flow: came back from Stripe, had to log in again
     const pending = sessionStorage.getItem('stripe_upgrade_pending');
-    if (pending && !isPro) {
+    if (pending) {
       setUpgradedBanner(true);
       setRefreshing(true);
       let attempts = 0;
@@ -93,10 +88,11 @@ export function Settings() {
               sessionStorage.removeItem('stripe_upgrade_pending');
               setRefreshing(false);
               clearInterval(poll);
+              return;
             }
           }
         } catch {}
-        if (attempts >= 10) {
+        if (attempts >= 12) {
           sessionStorage.removeItem('stripe_upgrade_pending');
           setRefreshing(false);
           clearInterval(poll);

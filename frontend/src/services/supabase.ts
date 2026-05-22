@@ -6,13 +6,22 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 if (!supabaseUrl) console.error('VITE_SUPABASE_URL not set');
 if (!supabaseAnonKey) console.error('VITE_SUPABASE_ANON_KEY not set');
 
-// NO persistSession — every tab/page refresh requires a fresh login.
-// This is intentional: prevents an admin session leaking to another user
-// who opens the same URL in a different tab or device.
+// We use sessionStorage (not localStorage) as our session store.
+// - sessionStorage is tab-scoped: opening a new tab = new session = must log in again ✓
+// - sessionStorage survives page reloads in the SAME tab ✓
+// - This means Stripe's redirect (same-tab reload) keeps the session ✓
+// - Another user opening the URL in their own tab gets no session ✓
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: false,
-    persistSession: false,
+    autoRefreshToken: true,
+    persistSession: true,
     detectSessionInUrl: false,
+    storage: {
+      // Use sessionStorage instead of localStorage
+      getItem: (key: string) => sessionStorage.getItem(key),
+      setItem: (key: string, value: string) => sessionStorage.setItem(key, value),
+      removeItem: (key: string) => sessionStorage.removeItem(key),
+    },
   },
 });
+
