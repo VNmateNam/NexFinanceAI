@@ -37,6 +37,31 @@ export function Settings() {
       ? 'bg-violet-400/10 text-violet-400 border-violet-400/20'
       : 'bg-gray-700 text-gray-400 border-gray-600';
 
+  // Helper: poll /api/auth/me until plan is pro (fallback when verifySession fails)
+  function startPollMe(onSuccess?: () => void) {
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      try {
+        const r = await api.get('/api/auth/me');
+        if (r.data.data) {
+          setUser(r.data.data);
+          if (r.data.data.plan === 'pro' || r.data.data.plan === 'enterprise') {
+            setRefreshing(false);
+            onSuccess?.();
+            clearInterval(poll);
+            return;
+          }
+        }
+      } catch {}
+      if (attempts >= 12) {
+        setRefreshing(false);
+        onSuccess?.();
+        clearInterval(poll);
+      }
+    }, 1500);
+  }
+
   // Detect Stripe return
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -47,24 +72,25 @@ export function Settings() {
       setUpgradedBanner(true);
       setRefreshing(true);
 
-      // Always poll — isPro from store may not reflect backend yet at mount time
-      let attempts = 0;
-      const poll = setInterval(async () => {
-        attempts++;
-        try {
-          const r = await api.get('/api/auth/me');
+      const session_id = params.get('session_id') || undefined;
+
+      // Step 1: call verifySession — this upgrades the DB immediately
+      api.post('/api/stripe/verify-session', { session_id })
+        .then(r => {
           if (r.data.data) {
             setUser(r.data.data);
-            if (r.data.data.plan === 'pro' || r.data.data.plan === 'enterprise') {
-              setRefreshing(false);
-              clearInterval(poll);
-              return;
-            }
+            setRefreshing(false);
+          } else {
+            // Fallback: poll /me in case verify returned unexpected shape
+            startPollMe();
           }
-        } catch {}
-        if (attempts >= 12) { setRefreshing(false); clearInterval(poll); }
-      }, 1500);
-      return () => clearInterval(poll);
+        })
+        .catch(() => {
+          // verifySession failed (e.g. 401 before session restored) — fall back to polling
+          startPollMe();
+        });
+
+      return;
     }
 
     if (params.get('cancelled') === '1') {
@@ -72,33 +98,12 @@ export function Settings() {
       return;
     }
 
-    // Re-login flow: came back from Stripe, had to log in again
+    // Re-login flow: session_id is gone but flag remains
     const pending = sessionStorage.getItem('stripe_upgrade_pending');
     if (pending) {
       setUpgradedBanner(true);
       setRefreshing(true);
-      let attempts = 0;
-      const poll = setInterval(async () => {
-        attempts++;
-        try {
-          const r = await api.get('/api/auth/me');
-          if (r.data.data) {
-            setUser(r.data.data);
-            if (r.data.data.plan === 'pro' || r.data.data.plan === 'enterprise') {
-              sessionStorage.removeItem('stripe_upgrade_pending');
-              setRefreshing(false);
-              clearInterval(poll);
-              return;
-            }
-          }
-        } catch {}
-        if (attempts >= 12) {
-          sessionStorage.removeItem('stripe_upgrade_pending');
-          setRefreshing(false);
-          clearInterval(poll);
-        }
-      }, 1500);
-      return () => clearInterval(poll);
+      startPollMe(() => sessionStorage.removeItem('stripe_upgrade_pending'));
     }
   }, []);
 
@@ -174,14 +179,32 @@ export function Settings() {
       {upgradedBanner && (
         <div className="flex items-start gap-3 p-4 bg-violet-400/10 border border-violet-400/20 rounded-xl">
           <Sparkles size={18} className="text-violet-400 flex-shrink-0 mt-0.5" />
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-bold text-violet-400">Payment received!</p>
             {refreshing
-              ? <p className="text-xs text-gray-400 mt-0.5">Activating your Pro plan… <span className="inline-block w-3 h-3 border border-violet-400/40 border-t-violet-400 rounded-full animate-spin align-middle ml-1" /></p>
-              : <p className="text-xs text-gray-400 mt-0.5">Your Pro plan is now active. Enjoy AI Chat and Alerts!</p>
+              ? <p className="text-xs text-gray-400 mt-0.5">
+                  Activating your Pro plan…
+                  <span className="inline-block w-3 h-3 border border-violet-400/40 border-t-violet-400 rounded-full animate-spin align-middle ml-1.5" />
+                </p>
+              : isPro
+                ? <p className="text-xs text-gray-400 mt-0.5">Your Pro plan is now active. Enjoy AI Chat and Alerts!</p>
+                : <div className="mt-1.5">
+                    <p className="text-xs text-yellow-400 mb-2">Still showing free? Click below to activate:</p>
+                    <button
+                      onClick={() => {
+                        setRefreshing(true);
+                        api.post('/api/stripe/verify-session', {})
+                          .then(r => { if (r.data.data) { setUser(r.data.data); } })
+                          .catch(() => {})
+                          .finally(() => setRefreshing(false));
+                      }}
+                      className="btn-primary text-xs h-7 px-3 flex items-center gap-1.5">
+                      <Sparkles size={11} /> Activate Pro Now
+                    </button>
+                  </div>
             }
           </div>
-          <button onClick={() => setUpgradedBanner(false)} className="ml-auto text-gray-600 hover:text-gray-400 text-lg leading-none">&times;</button>
+          <button onClick={() => setUpgradedBanner(false)} className="ml-auto text-gray-600 hover:text-gray-400 text-lg leading-none flex-shrink-0">&times;</button>
         </div>
       )}
 

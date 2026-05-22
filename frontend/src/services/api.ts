@@ -78,6 +78,7 @@ export const adminApi = {
 export const stripeApi = {
   createCheckoutSession: () => api.post('/api/stripe/create-checkout-session').then(r => r.data),
   createPortalSession: () => api.post('/api/stripe/create-portal-session').then(r => r.data),
+  verifySession: (session_id?: string) => api.post('/api/stripe/verify-session', { session_id }).then(r => r.data),
 };
 
 export default api;

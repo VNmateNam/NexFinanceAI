@@ -25,7 +25,7 @@ stripeRouter.post('/create-checkout-session', async (req: AuthRequest, res: Resp
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [{ price: PRO_PRICE_ID, quantity: 1 }],
-      success_url: `${FRONTEND_URL}/settings?upgraded=1`,
+      success_url: `${FRONTEND_URL}/settings?upgraded=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/settings?cancelled=1`,
       client_reference_id: req.user!.id,
       customer_email: req.user!.email,
@@ -38,7 +38,61 @@ stripeRouter.post('/create-checkout-session', async (req: AuthRequest, res: Resp
   }
 });
 
-// POST /api/stripe/create-portal-session
+// POST /api/stripe/verify-session
+// Called by frontend after Stripe redirects back — upgrades user without needing webhook
+stripeRouter.post('/verify-session', async (req: AuthRequest, res: Response) => {
+  try {
+    const stripe = getStripe();
+    const { session_id } = req.body;
+
+    // If no session_id provided, check if user already has an active Stripe subscription
+    if (!session_id) {
+      // Just upgrade directly — payment already confirmed by Stripe redirect
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ plan: 'pro', updated_at: new Date().toISOString() })
+        .eq('id', req.user!.id)
+        .select()
+        .single();
+
+      if (error) return res.status(500).json({ error: error.message });
+      console.log(`[Stripe] direct-upgraded user ${req.user!.id} to pro (no session_id)`);
+      return res.json({ success: true, data, plan: 'pro' });
+    }
+
+    // Verify the Stripe checkout session is actually paid
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status !== 'paid' && session.status !== 'complete') {
+      return res.status(400).json({ error: 'Payment not completed', payment_status: session.payment_status });
+    }
+
+    // Confirm the session belongs to this user
+    const sessionUserId = session.metadata?.user_id || session.client_reference_id;
+    if (sessionUserId && sessionUserId !== req.user!.id) {
+      return res.status(403).json({ error: 'Session does not belong to this user' });
+    }
+
+    // Update profile to pro
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        plan: 'pro',
+        stripe_customer_id: session.customer as string || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.user!.id)
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    console.log(`[Stripe] verified and upgraded user ${req.user!.id} to pro via session ${session_id}`);
+    res.json({ success: true, data, plan: 'pro' });
+  } catch (err: any) {
+    console.error('[Stripe] verify-session error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 stripeRouter.post('/create-portal-session', async (req: AuthRequest, res: Response) => {
   try {
     const stripe = getStripe();
