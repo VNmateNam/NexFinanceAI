@@ -21,35 +21,53 @@ export function SignUp() {
     const trimName = name.trim();
     const trimEmail = email.trim().toLowerCase();
     if (!trimName) { setError('Please enter your full name.'); return; }
-    if (!trimEmail) { setError('Please enter your email.'); return; }
+    if (!trimEmail || !trimEmail.includes('@')) { setError('Please enter a valid email.'); return; }
     if (!pw || pw.length < 6) { setError('Password must be at least 6 characters.'); return; }
 
     setLoading(true);
     setError('');
 
-    const { data, error: authError } = await supabase.auth.signUp({
-      email: trimEmail,
-      password: pw,
-      options: {
-        data: { full_name: trimName },
-        // No email confirmation redirect needed - supabase handles it
-      },
-    });
+    try {
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: trimEmail,
+        password: pw,
+        options: {
+          data: { full_name: trimName },
+        },
+      });
 
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
-      return;
+      if (authError) {
+        // Map common Supabase errors to friendly messages
+        const msg = authError.message || '';
+        if (msg.includes('already registered') || msg.includes('already been registered')) {
+          setError('An account with this email already exists. Try signing in instead.');
+        } else if (msg.includes('Password should')) {
+          setError('Password must be at least 6 characters.');
+        } else if (msg.includes('valid email') || msg.includes('invalid')) {
+          setError('Please enter a valid email address.');
+        } else if (authError.status === 500) {
+          // Supabase 500 usually means the email is already taken but confirmation is pending
+          setError('This email may already be registered. Try signing in, or use a different email.');
+        } else {
+          setError(msg || 'Sign up failed. Please try again.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (data.session) {
+        // Email confirmation disabled — user is auto-logged in
+        navigate('/dashboard', { replace: true });
+      } else if (data.user && !data.session) {
+        // Email confirmation required
+        setSuccess(true);
+      } else {
+        setSuccess(true);
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Network error. Please check your connection and try again.');
     }
 
-    // If email confirmation is disabled in Supabase, user is auto-confirmed
-    if (data.session) {
-      // Auto-logged in
-      navigate('/dashboard', { replace: true });
-    } else {
-      // Email confirmation required
-      setSuccess(true);
-    }
     setLoading(false);
   }
 
@@ -94,7 +112,6 @@ export function SignUp() {
           <h2 className="text-lg font-bold mb-1">Create account</h2>
           <p className="text-sm text-gray-500 mb-5">Free plan · upgrade anytime</p>
 
-          {/* Plan info */}
           <div className="flex gap-3 mb-4">
             <div className="flex-1 bg-bg-3 border border-border rounded-lg p-3 text-center">
               <p className="text-xs text-gray-500 mb-1">Free</p>
@@ -115,8 +132,7 @@ export function SignUp() {
               <div className="relative">
                 <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input className="input pl-9" type="text" placeholder="John Smith"
-                  value={name}
-                  onChange={e => { setName(e.target.value); setError(''); }}
+                  value={name} onChange={e => { setName(e.target.value); setError(''); }}
                   onKeyDown={e => e.key === 'Enter' && submit()}
                   autoComplete="name" autoFocus />
               </div>
@@ -126,8 +142,7 @@ export function SignUp() {
               <div className="relative">
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input className="input pl-9" type="email" placeholder="you@example.com"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setError(''); }}
+                  value={email} onChange={e => { setEmail(e.target.value); setError(''); }}
                   onKeyDown={e => e.key === 'Enter' && submit()}
                   autoComplete="email" />
               </div>
@@ -138,8 +153,7 @@ export function SignUp() {
                 <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input className="input pl-9 pr-10"
                   type={showPw ? 'text' : 'password'} placeholder="Min 6 characters"
-                  value={pw}
-                  onChange={e => { setPw(e.target.value); setError(''); }}
+                  value={pw} onChange={e => { setPw(e.target.value); setError(''); }}
                   onKeyDown={e => e.key === 'Enter' && submit()}
                   autoComplete="new-password" />
                 <button type="button" onClick={() => setShowPw(s => !s)}
@@ -165,12 +179,11 @@ export function SignUp() {
 
           <p className="text-center text-sm text-gray-500 mt-4">
             Already have an account?{' '}
-            <Link to="/login" className="text-gold hover:underline font-medium">
-              Sign in
-            </Link>
+            <Link to="/login" className="text-gold hover:underline font-medium">Sign in</Link>
           </p>
         </div>
       </div>
     </div>
   );
 }
+

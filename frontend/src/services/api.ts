@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
 console.log('[API] base:', API_BASE);
 
-export const api = axios.create({ baseURL: API_BASE, timeout: 15000 });
+export const api = axios.create({ baseURL: API_BASE, timeout: 20000 });
 
 // Attach Supabase session token to every request
 api.interceptors.request.use(async config => {
@@ -16,11 +16,20 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
-// On 401 — refresh session and retry once
+// Response interceptor: retry on network errors + handle 401
 api.interceptors.response.use(
   res => res,
   async (err) => {
     const cfg = err.config;
+
+    // Retry network errors once (Railway cold start / intermittent ERR_FAILED)
+    if (!err.response && !cfg?._networkRetried) {
+      cfg._networkRetried = true;
+      await new Promise(r => setTimeout(r, 1200)); // wait 1.2s then retry
+      return api(cfg);
+    }
+
+    // On 401 — refresh session and retry once
     if (err.response?.status !== 401 || cfg?._retried) return Promise.reject(err);
     if (cfg?.url?.includes('/api/auth/')) return Promise.reject(err);
     cfg._retried = true;

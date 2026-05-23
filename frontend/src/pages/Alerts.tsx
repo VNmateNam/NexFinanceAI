@@ -116,15 +116,9 @@ export function Alerts() {
 function AlertsContent({ userId }: { userId: string }) {
   const { isAuthenticated } = useAuthStore();
 
-  // ── Load from localStorage SYNCHRONOUSLY on first render (per-user) ──
-  const [alerts, setAlerts] = useState<PriceAlert[]>(() => {
-    const stored = lsGet(userId);
-    if (stored === null) {
-      lsSet(userId, SEED);
-      return SEED;
-    }
-    return stored;
-  });
+  // Start with empty + loading — never flash localStorage data before backend sync
+  const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [history, setHistory] = useState<AlertHistoryItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -145,7 +139,7 @@ function AlertsContent({ userId }: { userId: string }) {
     lsSet(userId, next);
   };
 
-  // ── Fetch from backend once when authenticated ────────────────
+  // ── Fetch from backend — backend is always source of truth ────
   useEffect(() => {
     if (!isAuthenticated || fetchedRef.current) return;
     fetchedRef.current = true;
@@ -153,14 +147,30 @@ function AlertsContent({ userId }: { userId: string }) {
     alertsApi.getAlerts()
       .then(serverAlerts => {
         if (Array.isArray(serverAlerts)) {
-          // Server is source of truth when authenticated
           persist(serverAlerts);
           setBackendSync(true);
+        } else {
+          // Backend returned unexpected shape — fall back to localStorage
+          const stored = lsGet(userId);
+          if (stored !== null) {
+            setAlerts(stored);
+          } else {
+            persist(SEED);
+          }
         }
       })
       .catch(() => {
-        // Backend unavailable — keep localStorage data
+        // Backend unreachable — fall back to localStorage silently
+        const stored = lsGet(userId);
+        if (stored !== null) {
+          setAlerts(stored);
+        } else {
+          persist(SEED);
+        }
         setBackendSync(false);
+      })
+      .finally(() => {
+        setLoading(false);
       });
 
     alertsApi.getHistory()
@@ -228,6 +238,18 @@ function AlertsContent({ userId }: { userId: string }) {
 
   const activeCount = alerts.filter(a => a.is_active).length;
   const currentAsset = ASSETS.find(a => a.symbol === form.symbol);
+
+  // Show spinner until backend sync completes — prevents any flash of stale data
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-7 h-7 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+          <p className="text-xs text-gray-600">Loading your alerts…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
