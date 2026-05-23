@@ -8,12 +8,6 @@
 
 import type { PriceAlert, PortfolioPosition } from '../types';
 
-const KEYS = {
-  ALERTS_DATA: 'nexusai_alerts_v2',
-  ALERTS_INIT: 'nexusai_alerts_initialized',
-  PORTFOLIO:   'nexusai_portfolio_v2',
-} as const;
-
 function read<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -28,30 +22,29 @@ function write(key: string, value: unknown) {
   catch { /* quota exceeded */ }
 }
 
-// ── Alerts ────────────────────────────────────────────────────
+// ── Alerts (per-user keyed to prevent cross-account data bleed) ──────────
+const alertDataKey  = (uid: string) => `nexusai_alerts_v3_${uid}`;
+const alertInitKey  = (uid: string) => `nexusai_alerts_init_${uid}`;
+
 export const localAlerts = {
-  /** Returns null if never initialized (caller should seed), [] if initialized but empty */
-  get: (): PriceAlert[] | null => {
-    const initialized = localStorage.getItem(KEYS.ALERTS_INIT);
-    if (initialized === null) return null; // never been set
-    return read<PriceAlert[]>(KEYS.ALERTS_DATA, []);
+  get: (userId: string): PriceAlert[] | null => {
+    const initialized = localStorage.getItem(alertInitKey(userId));
+    if (initialized === null) return null;
+    return read<PriceAlert[]>(alertDataKey(userId), []);
   },
-
-  set: (alerts: PriceAlert[]) => {
-    write(KEYS.ALERTS_DATA, alerts);
-    write(KEYS.ALERTS_INIT, true); // mark as initialized
+  set: (userId: string, alerts: PriceAlert[]) => {
+    write(alertDataKey(userId), alerts);
+    write(alertInitKey(userId), true);
   },
-
-  /** Call once with seed data to initialize */
-  seed: (alerts: PriceAlert[]) => {
-    if (localStorage.getItem(KEYS.ALERTS_INIT) === null) {
-      write(KEYS.ALERTS_DATA, alerts);
-      write(KEYS.ALERTS_INIT, true);
+  seed: (userId: string, alerts: PriceAlert[]) => {
+    if (localStorage.getItem(alertInitKey(userId)) === null) {
+      write(alertDataKey(userId), alerts);
+      write(alertInitKey(userId), true);
     }
   },
 };
 
-// ── Portfolio ─────────────────────────────────────────────────
+// ── Portfolio (shared — same positions for all, no sensitive cross-account risk) ──
 export const localPortfolio = {
   get: (): PortfolioPosition[] => read<PortfolioPosition[]>(KEYS.PORTFOLIO, []),
   set: (positions: PortfolioPosition[]) => write(KEYS.PORTFOLIO, positions),

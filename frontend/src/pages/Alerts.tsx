@@ -11,17 +11,18 @@ import { cn } from '../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
 
 // ── localStorage helpers ───────────────────────────────────────
-const LS_KEY = 'nexusai_alerts_v3';
-const LS_INIT = 'nexusai_alerts_init_v3';
-
-function lsGet(): PriceAlert[] | null {
-  if (localStorage.getItem(LS_INIT) === null) return null; // never initialised
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
+function lsGet(userId: string): PriceAlert[] | null {
+  const initKey = `nexusai_alerts_init_${userId}`;
+  const dataKey = `nexusai_alerts_v3_${userId}`;
+  if (localStorage.getItem(initKey) === null) return null;
+  try { return JSON.parse(localStorage.getItem(dataKey) || '[]'); }
   catch { return []; }
 }
-function lsSet(alerts: PriceAlert[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(alerts));
-  localStorage.setItem(LS_INIT, '1');
+function lsSet(userId: string, alerts: PriceAlert[]) {
+  const initKey = `nexusai_alerts_init_${userId}`;
+  const dataKey = `nexusai_alerts_v3_${userId}`;
+  localStorage.setItem(dataKey, JSON.stringify(alerts));
+  localStorage.setItem(initKey, '1');
 }
 
 const SEED: PriceAlert[] = [
@@ -90,7 +91,6 @@ export function Alerts() {
   const isPro = user?.plan === 'pro' || user?.plan === 'enterprise';
   const isAdmin = user?.is_admin === true;
 
-  // Pro gate — admins bypass this
   if (!isPro && !isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
@@ -110,19 +110,17 @@ export function Alerts() {
     );
   }
 
-  return <AlertsContent />;
+  return <AlertsContent userId={user!.id} />;
 }
 
-function AlertsContent() {
+function AlertsContent({ userId }: { userId: string }) {
   const { isAuthenticated } = useAuthStore();
 
-  // ── Load from localStorage SYNCHRONOUSLY on first render ─────
-  // This prevents the flash — data is available immediately
+  // ── Load from localStorage SYNCHRONOUSLY on first render (per-user) ──
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => {
-    const stored = lsGet();
+    const stored = lsGet(userId);
     if (stored === null) {
-      // First ever visit — seed and return seed
-      lsSet(SEED);
+      lsSet(userId, SEED);
       return SEED;
     }
     return stored;
@@ -144,7 +142,7 @@ function AlertsContent() {
   // ── Sync localStorage whenever alerts change ──────────────────
   const persist = (next: PriceAlert[]) => {
     setAlerts(next);
-    lsSet(next);
+    lsSet(userId, next);
   };
 
   // ── Fetch from backend once when authenticated ────────────────

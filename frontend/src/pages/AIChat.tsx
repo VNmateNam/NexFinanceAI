@@ -18,25 +18,86 @@ const QUICK_PROMPTS = [
 
 interface Msg { id: string; role: 'user' | 'assistant'; content: string }
 
+// Inline: **bold**, *italic*, `code`
+function inlineFmt(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((p, i) => {
+    if (p.startsWith('**') && p.endsWith('**'))
+      return <strong key={i} className="font-bold text-white">{p.slice(2,-2)}</strong>;
+    if (p.startsWith('*') && p.endsWith('*'))
+      return <em key={i} className="italic text-gray-300">{p.slice(1,-1)}</em>;
+    if (p.startsWith('`') && p.endsWith('`'))
+      return <code key={i} className="font-mono text-[11px] bg-bg-4 text-gold px-1.5 py-0.5 rounded border border-border-light">{p.slice(1,-1)}</code>;
+    return p;
+  });
+}
+
+// Full markdown renderer
+function renderMd(content: string) {
+  const lines = content.split('\n');
+  const out: React.ReactNode[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    if (line.startsWith('### ')) {
+      out.push(<p key={i} className="text-[10px] font-bold uppercase tracking-widest text-gold/70 mt-3 mb-1 first:mt-0">{inlineFmt(line.slice(4))}</p>);
+      i++; continue;
+    }
+    if (line.startsWith('## ')) {
+      out.push(<p key={i} className="text-sm font-bold text-white mt-3 mb-1 first:mt-0">{inlineFmt(line.slice(3))}</p>);
+      i++; continue;
+    }
+    if (/^[-*] /.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*] /.test(lines[i])) { items.push(lines[i].slice(2)); i++; }
+      out.push(
+        <ul key={`ul${i}`} className="my-1.5 space-y-1">
+          {items.map((it, j) => (
+            <li key={j} className="flex items-start gap-2 text-sm leading-relaxed">
+              <span className="text-gold/70 mt-2 flex-shrink-0" style={{fontSize:5}}>●</span>
+              <span>{inlineFmt(it)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+    if (/^\d+\. /.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\. /.test(lines[i])) { items.push(lines[i].replace(/^\d+\. /,'')); i++; }
+      out.push(
+        <ol key={`ol${i}`} className="my-1.5 space-y-1">
+          {items.map((it, j) => (
+            <li key={j} className="flex items-start gap-2 text-sm leading-relaxed">
+              <span className="text-gold font-bold font-mono text-[11px] mt-0.5 w-4 flex-shrink-0">{j+1}.</span>
+              <span>{inlineFmt(it)}</span>
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+    if (line.trim() === '---') { out.push(<div key={i} className="border-t border-border my-2" />); i++; continue; }
+    out.push(<p key={i} className="text-sm leading-relaxed">{inlineFmt(line)}</p>);
+    i++;
+  }
+  return out;
+}
+
 function Bubble({ msg }: { msg: Msg }) {
   const isAI = msg.role === 'assistant';
   return (
-    <div className={cn('flex gap-3 items-start', !isAI && 'flex-row-reverse')}>
-      <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5',
+    <div className={cn('flex gap-2.5 items-end', !isAI && 'flex-row-reverse')}>
+      <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mb-0.5 shadow-lg',
         isAI ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-bg'
              : 'bg-gradient-to-br from-violet-500 to-purple-700 text-white')}>
         {isAI ? <Bot size={13} /> : 'U'}
       </div>
-      <div className={cn('max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed border',
-        isAI ? 'bg-bg-3 border-border text-gray-200' : 'bg-violet-500/15 border-violet-500/30 text-gray-200')}>
-        {msg.content.split('\n').map((line, i) => (
-          <p key={i} className={i > 0 ? 'mt-1.5' : ''}>
-            {line.split(/(\*\*[^*]+\*\*)/).map((p, j) =>
-              p.startsWith('**') && p.endsWith('**')
-                ? <strong key={j} className="text-white font-bold">{p.slice(2,-2)}</strong>
-                : p)}
-          </p>
-        ))}
+      <div className={cn('max-w-[85%] rounded-2xl px-4 py-3 border shadow-sm',
+        isAI ? 'bg-bg-3 border-border/60 text-gray-200 rounded-bl-sm'
+             : 'bg-violet-600/20 border-violet-500/30 text-gray-100 rounded-br-sm')}>
+        {isAI ? <div className="space-y-1">{renderMd(msg.content)}</div>
+               : <p className="text-sm leading-relaxed">{msg.content}</p>}
       </div>
     </div>
   );
@@ -44,13 +105,13 @@ function Bubble({ msg }: { msg: Msg }) {
 
 function Typing() {
   return (
-    <div className="flex gap-3 items-start">
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center flex-shrink-0">
+    <div className="flex gap-2.5 items-end">
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center flex-shrink-0 mb-0.5 shadow-lg">
         <Bot size={13} className="text-bg" />
       </div>
-      <div className="bg-bg-3 border border-border rounded-xl px-4 py-3">
-        <div className="flex gap-1 items-center h-4">
-          {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay:`${i*0.15}s` }} />)}
+      <div className="bg-bg-3 border border-border/60 rounded-2xl rounded-bl-sm px-4 py-3.5 shadow-sm">
+        <div className="flex gap-1 items-center">
+          {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 bg-gold/40 rounded-full animate-bounce" style={{animationDelay:`${i*0.15}s`}} />)}
         </div>
       </div>
     </div>

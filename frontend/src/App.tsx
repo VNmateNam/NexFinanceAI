@@ -16,7 +16,9 @@ import { supabase } from './services/supabase';
 import api from './services/api';
 
 function ProtectedRoute({ children, adminOnly }: { children: React.ReactNode; adminOnly?: boolean }) {
-  const { isAuthenticated, user, _hydrated } = useAuthStore();
+  const { isAuthenticated, user, _hydrated, _profileLoaded } = useAuthStore();
+
+  // Spinner while Supabase session resolves
   if (!_hydrated) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
@@ -24,14 +26,28 @@ function ProtectedRoute({ children, adminOnly }: { children: React.ReactNode; ad
       </div>
     );
   }
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  // Spinner while real profile loads from backend — prevents flash of wrong plan/gates
+  if (!_profileLoaded) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+          <p className="text-xs text-gray-600">Loading your account…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (adminOnly && !user?.is_admin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
 export default function App() {
   const { fetchAll, jitterPrices } = useMarketStore();
-  const { setUser, setHydrated, logout } = useAuthStore();
+  const { setUser, setHydrated, setProfileLoaded, logout } = useAuthStore();
 
   // Re-fetch profile from backend (called after Stripe return, focus, etc.)
   const refreshProfile = useCallback(async () => {
@@ -82,35 +98,49 @@ export default function App() {
           && session?.user
         ) {
           clearTimeout(timeout);
-          // Set basic user info immediately so UI unblocks
-          setUser({
-            id: session.user.id,
-            email: session.user.email ?? '',
-            full_name: session.user.user_metadata?.full_name ?? '',
-            plan: 'free',
-            is_admin: false,
-            created_at: session.user.created_at ?? '',
-          });
+          // Do NOT setUser with plan:'free' yet — wait for real profile to avoid flash
+          // Just mark hydrated so the spinner resolves to login or content
           setHydrated();
 
           // Check if returning from Stripe
           const pendingUpgrade = sessionStorage.getItem('stripe_upgrade_pending');
 
-          // Enrich with real profile from backend (has plan, is_admin, etc.)
+          // Fetch real profile — this is the single source of truth
           api.get('/api/auth/me')
             .then(r => {
               if (r.data.data) {
                 setUser(r.data.data);
-                // If upgrade pending but plan not yet updated, start polling
+                setProfileLoaded();
                 if (pendingUpgrade && r.data.data.plan !== 'pro' && r.data.data.plan !== 'enterprise') {
                   pollForUpgrade();
                 } else if (pendingUpgrade) {
-                  // Already updated — just clean up the flag
                   sessionStorage.removeItem('stripe_upgrade_pending');
                 }
+              } else {
+                // Backend returned nothing — use Supabase data as fallback
+                setUser({
+                  id: session.user.id,
+                  email: session.user.email ?? '',
+                  full_name: session.user.user_metadata?.full_name ?? '',
+                  plan: 'free',
+                  is_admin: false,
+                  created_at: session.user.created_at ?? '',
+                });
+                setProfileLoaded();
               }
             })
-            .catch(() => { /* keep Supabase data */ });
+            .catch(() => {
+              // Network error — use Supabase data
+              setUser({
+                id: session.user.id,
+                email: session.user.email ?? '',
+                full_name: session.user.user_metadata?.full_name ?? '',
+                plan: 'free',
+                is_admin: false,
+                created_at: session.user.created_at ?? '',
+              });
+              setProfileLoaded();
+            });
         }
 
         if (event === 'INITIAL_SESSION' && !session) {
@@ -133,16 +163,6 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
-
-  // Re-fetch profile when window gets focus (covers edge cases like manual plan changes)
-  useEffect(() => {
-    const onFocus = () => {
-      const { isAuthenticated } = useAuthStore.getState();
-      if (isAuthenticated) refreshProfile();
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [refreshProfile]);
 
   useEffect(() => {
     fetchAll();
