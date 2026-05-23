@@ -10,9 +10,8 @@ import type { PriceAlert, PortfolioPosition } from '../types';
 
 const KEYS = {
   ALERTS_DATA: 'nexusai_alerts_v2',
-  ALERTS_INIT: 'nexusai_alerts_initialized', // separate boolean flag
+  ALERTS_INIT: 'nexusai_alerts_initialized',
   PORTFOLIO:   'nexusai_portfolio_v2',
-  CHAT:        'nexusai_chat_v2',
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -58,14 +57,17 @@ export const localPortfolio = {
   set: (positions: PortfolioPosition[]) => write(KEYS.PORTFOLIO, positions),
 };
 
-// ── Chat (last 40 messages) ───────────────────────────────────
+// ── Chat (last 40 messages, keyed per user so accounts don't share history) ──
+const chatKey = (userId: string) => `nexusai_chat_v3_${userId}`;
+
 export const localChat = {
-  get: (): { role: string; content: string }[] =>
-    read<{ role: string; content: string }[]>(KEYS.CHAT, []),
-  append: (msg: { role: string; content: string }) => {
-    const current = localChat.get();
-    write(KEYS.CHAT, [...current, msg].slice(-40));
+  get: (userId: string): { role: string; content: string }[] =>
+    read<{ role: string; content: string }[]>(chatKey(userId), []),
+  append: (userId: string, msg: { role: string; content: string }) => {
+    const current = localChat.get(userId);
+    write(chatKey(userId), [...current, msg].slice(-40));
   },
-  set: (msgs: { role: string; content: string }[]) => write(KEYS.CHAT, msgs),
-  clear: () => write(KEYS.CHAT, []),
+  set: (userId: string, msgs: { role: string; content: string }[]) =>
+    write(chatKey(userId), msgs),
+  clear: (userId: string) => write(chatKey(userId), []),
 };

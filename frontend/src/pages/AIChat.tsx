@@ -61,8 +61,9 @@ export function AIChat() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const isPro = user?.plan === 'pro' || user?.plan === 'enterprise';
+  const isAdmin = user?.is_admin === true;
 
-  if (!isPro) {
+  if (!isPro && !isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div className="w-16 h-16 bg-gold/10 border border-gold/20 rounded-2xl flex items-center justify-center mb-4">
@@ -81,10 +82,10 @@ export function AIChat() {
     );
   }
 
-  return <AIChatContent />;
+  return <AIChatContent userId={user!.id} />;
 }
 
-function AIChatContent() {
+function AIChatContent({ userId }: { userId: string }) {
   const { commodities, stocks } = useMarketStore();
 
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -95,7 +96,7 @@ function AIChatContent() {
 
   // Load persisted chat
   useEffect(() => {
-    const saved = localChat.get();
+    const saved = localChat.get(userId);
     if (saved.length > 0) {
       setMessages(saved.map((m,i) => ({ id:`s-${i}`, role: m.role as 'user'|'assistant', content: m.content })));
     } else {
@@ -106,7 +107,7 @@ function AIChatContent() {
         content: `Hello! I'm NexusAI — your AI financial assistant.\n\nLive data I can see:\n**Gold (XAU):** $${(gold?.price??3327.40).toLocaleString()} (${(gold?.change_pct??1.24)>=0?'+':''}${(gold?.change_pct??1.24).toFixed(2)}%)\n**WTI Oil:** $${(oil?.price??62.18).toFixed(2)} (${(oil?.change_pct??-0.41).toFixed(2)}%)\n\nAsk me anything about markets, predictions, or investment strategy!`,
       }]);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
@@ -121,13 +122,13 @@ function AIChatContent() {
     setMessages(history);
     setInput('');
     setLoading(true);
-    localChat.append({ role: 'user', content });
+    localChat.append(userId, { role: 'user', content });
 
     try {
       const reply = await aiApi.chat(history.slice(-10).map(({ role, content }) => ({ role, content })));
       const replyMsg: Msg = { id: `r-${Date.now()}`, role: 'assistant', content: reply };
       setMessages(prev => [...prev, replyMsg]);
-      localChat.append({ role: 'assistant', content: reply });
+      localChat.append(userId, { role: 'assistant', content: reply });
     } catch (err: any) {
       const errContent = err.message?.includes('401')
         ? '❌ Session expired. Please sign in again.'
@@ -142,7 +143,7 @@ function AIChatContent() {
   }, [input, loading, messages]);
 
   function clearChat() {
-    localChat.clear();
+    localChat.clear(userId);
     setMessages([{ id:'c', role:'assistant', content:'Chat cleared. How can I help you?' }]);
   }
 

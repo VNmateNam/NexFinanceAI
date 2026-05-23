@@ -88,9 +88,10 @@ export function Alerts() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const isPro = user?.plan === 'pro' || user?.plan === 'enterprise';
+  const isAdmin = user?.is_admin === true;
 
-  // Pro gate — shown BEFORE the inner component (which has all hooks)
-  if (!isPro) {
+  // Pro gate — admins bypass this
+  if (!isPro && !isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div className="w-16 h-16 bg-gold/10 border border-gold/20 rounded-2xl flex items-center justify-center mb-4">
