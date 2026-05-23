@@ -45,9 +45,10 @@ export const localAlerts = {
 };
 
 // ── Portfolio (shared — same positions for all, no sensitive cross-account risk) ──
+const PORTFOLIO_KEY = 'nexusai_portfolio_v2';
 export const localPortfolio = {
-  get: (): PortfolioPosition[] => read<PortfolioPosition[]>(KEYS.PORTFOLIO, []),
-  set: (positions: PortfolioPosition[]) => write(KEYS.PORTFOLIO, positions),
+  get: (): PortfolioPosition[] => read<PortfolioPosition[]>(PORTFOLIO_KEY, []),
+  set: (positions: PortfolioPosition[]) => write(PORTFOLIO_KEY, positions),
 };
 
 // ── Chat (last 40 messages, keyed per user so accounts don't share history) ──
