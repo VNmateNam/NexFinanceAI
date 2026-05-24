@@ -17,6 +17,7 @@ import { stripeRouter, stripeWebhookHandler } from './routes/stripe';
 import { checkAlerts } from './services/alertChecker';
 import { refreshPriceCache } from './services/priceService';
 
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 

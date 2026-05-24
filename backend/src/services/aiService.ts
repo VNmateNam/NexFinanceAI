@@ -248,10 +248,15 @@ export async function getMarketSentimentSummary(): Promise<{
   const cached = memCache.get<any>(cacheKey);
   if (cached) return cached;
 
-  const news = await getMarketNews();
-  const bullishCount = news.filter(n => n.ai_sentiment === 'bullish').length;
-  const bearishCount = news.filter(n => n.ai_sentiment === 'bearish').length;
-  const score = Math.round((bullishCount / Math.max(news.length, 1)) * 100);
+  // Safely fetch news — don't let this crash the sentiment endpoint
+  let news: any[] = [];
+  try {
+    news = await getMarketNews();
+  } catch { news = []; }
+
+  const bullishCount = news.filter((n: any) => n.ai_sentiment === 'bullish').length;
+  const bearishCount = news.filter((n: any) => n.ai_sentiment === 'bearish').length;
+  const score = news.length > 0 ? Math.round((bullishCount / news.length) * 100) : 50;
   const overall: 'bullish' | 'bearish' | 'neutral' = score > 55 ? 'bullish' : score < 40 ? 'bearish' : 'neutral';
 
   const summary = {
@@ -267,6 +272,6 @@ export async function getMarketSentimentSummary(): Promise<{
     ],
   };
 
-  memCache.set(cacheKey, summary, 900); // 15min
+  memCache.set(cacheKey, summary, 900);
   return summary;
 }
