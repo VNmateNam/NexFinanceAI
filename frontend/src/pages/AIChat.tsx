@@ -138,7 +138,7 @@ function renderMd(content: string) {
 function Bubble({ msg }: { msg: Msg }) {
   const isAI = msg.role === 'assistant';
   return (
-    <div className={cn('flex gap-2 items-end', !isAI && 'flex-row-reverse')}>
+    <div className={cn('flex gap-2 items-end w-full min-w-0', !isAI && 'flex-row-reverse')}>
       <div className={cn(
         'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mb-0.5 shadow-md',
         isAI ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-bg'
@@ -147,13 +147,13 @@ function Bubble({ msg }: { msg: Msg }) {
         {isAI ? <Bot size={13} /> : 'U'}
       </div>
       <div className={cn(
-        'max-w-[88%] rounded-2xl px-3.5 py-2.5 border shadow-sm min-w-0',
+        'max-w-[calc(100%-36px)] rounded-2xl px-3.5 py-2.5 border shadow-sm min-w-0 overflow-hidden',
         isAI ? 'bg-bg-3 border-border/60 text-gray-200 rounded-bl-sm'
              : 'bg-violet-600/20 border-violet-500/30 text-gray-100 rounded-br-sm'
       )}>
         {isAI
-          ? <div className="space-y-1 overflow-x-auto">{renderMd(msg.content)}</div>
-          : <p className="text-sm leading-relaxed">{msg.content}</p>}
+          ? <div className="space-y-1 overflow-x-auto w-full min-w-0 break-words">{renderMd(msg.content)}</div>
+          : <p className="text-sm leading-relaxed break-words">{msg.content}</p>}
       </div>
     </div>
   );
@@ -328,7 +328,7 @@ function AIChatContent({ userId }: { userId: string }) {
 
       <div className="grid lg:grid-cols-3 gap-4 sm:gap-5 items-start">
         {/* ── Chat window ── */}
-        <div className="lg:col-span-2 card flex flex-col h-[480px] sm:h-[540px] lg:h-[600px]">
+        <div className="lg:col-span-2 card flex flex-col h-[480px] sm:h-[540px] lg:h-[600px] overflow-hidden min-w-0">
           {/* Chat header */}
           <div className="flex items-center justify-between pb-3 border-b border-border mb-3 flex-shrink-0">
             <div className="flex items-center gap-2 min-w-0">
@@ -353,14 +353,14 @@ function AIChatContent({ userId }: { userId: string }) {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3 pr-1 min-h-0 w-full">
             {messages.map(m => <Bubble key={m.id} msg={m} />)}
             {loading && <Typing />}
             <div ref={endRef} />
           </div>
 
           {/* Quick prompt chips — scrollable row */}
-          <div className="flex gap-1.5 mt-3 pt-2.5 border-t border-border flex-shrink-0 overflow-x-auto scrollbar-none pb-0.5">
+          <div className="flex gap-1.5 mt-3 pt-2.5 border-t border-border flex-shrink-0 overflow-x-auto scrollbar-none pb-1 -mx-0.5 px-0.5">
             {QUICK_PROMPTS.slice(0, 4).map(q => (
               <button key={q.label} onClick={() => send(q.label)} disabled={loading}
                 className="text-xs bg-bg-3 hover:bg-bg-4 border border-border-light hover:border-gold text-gray-400 hover:text-gold px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40 whitespace-nowrap flex-shrink-0">
