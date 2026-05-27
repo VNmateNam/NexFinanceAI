@@ -70,17 +70,22 @@ export function Dashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <div>
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="min-w-0">
           <h1 className="page-title">Dashboard</h1>
           <p className="page-sub">Real-time commodity & equity intelligence</p>
         </div>
         <button onClick={fetchAll} disabled={loading}
-          className="btn-outline flex items-center gap-2 text-sm">
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-          {lastUpdated
-            ? `Updated ${formatDistanceToNow(lastUpdated, { addSuffix: true, includeSeconds: true })}`
-            : 'Refresh'}
+          className="btn-outline flex items-center gap-1.5 text-xs sm:text-sm shrink-0 px-2.5 py-1.5 sm:px-3 sm:py-2">
+          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+          <span className="hidden sm:inline">
+            {lastUpdated
+              ? `Updated ${formatDistanceToNow(lastUpdated, { addSuffix: true, includeSeconds: true })}`
+              : 'Refresh'}
+          </span>
+          <span className="sm:hidden">
+            {lastUpdated ? timeAgo : 'Refresh'}
+          </span>
         </button>
       </div>
 
