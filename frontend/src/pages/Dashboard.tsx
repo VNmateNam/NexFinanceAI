@@ -94,7 +94,7 @@ export function Dashboard() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-5">
         <MetricCard
           label="Gold (XAU/USD)"
           value={`$${(gold?.price ?? 3327.40).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
