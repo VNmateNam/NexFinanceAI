@@ -193,7 +193,7 @@ export function AIChat() {
         <p className="text-gray-400 text-sm mb-6 max-w-sm">
           AI Financial Assistant is available on the Pro plan. Upgrade to get access to Claude AI with live market context.
         </p>
-        <button onClick={() => navigate('/settings')} className="btn-primary flex items-center gap-2 px-6 py-2.5">
+        <button onClick={() => navigate('/settings?scroll=subscription')} className="btn-primary flex items-center gap-2 px-6 py-2.5">
           <Crown size={14} /> Upgrade to Pro — $20/mo
         </button>
         <p className="text-xs text-gray-600 mt-2">Sandbox mode · card 4242 4242 4242 4242</p>
@@ -316,33 +316,19 @@ function AIChatContent({ userId }: { userId: string }) {
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 mb-1">
+      <div className="mb-3">
         <div>
           <h1 className="page-title">AI Financial Assistant</h1>
           <p className="page-sub">Powered by Claude AI · live market context · history persists</p>
         </div>
-        {/* Mobile: toggle context panel */}
-        <button
-          onClick={() => setContextOpen(v => !v)}
-          className="lg:hidden btn-outline flex items-center gap-1.5 text-xs px-2.5 py-1.5 flex-shrink-0 mt-1"
-        >
-          <Zap size={11} className="text-gold" />
-          Context
-          <ChevronDown size={11} className={cn('transition-transform', contextOpen && 'rotate-180')} />
-        </button>
+
       </div>
 
-      {/* Mobile: collapsible context panel */}
-      {contextOpen && (
-        <div className="lg:hidden mb-4">{ContextPanel}</div>
-      )}
+
 
       <div className="grid lg:grid-cols-3 gap-4 sm:gap-5 items-start">
         {/* ── Chat window ── */}
-        <div
-          className="lg:col-span-2 card flex flex-col"
-          style={{ height: 'clamp(440px, calc(100dvh - 250px), 640px)' }}
-        >
+        <div className="lg:col-span-2 card flex flex-col h-[480px] sm:h-[540px] lg:h-[600px]">
           {/* Chat header */}
           <div className="flex items-center justify-between pb-3 border-b border-border mb-3 flex-shrink-0">
             <div className="flex items-center gap-2 min-w-0">
@@ -404,8 +390,23 @@ function AIChatContent({ userId }: { userId: string }) {
           </div>
         </div>
 
-        {/* ── Desktop: context panel ── */}
+        {/* ── Desktop: context panel (right column) ── */}
         <div className="hidden lg:block">{ContextPanel}</div>
+      </div>
+
+      {/* ── Mobile: context panel (below chat, collapsible) ── */}
+      <div className="lg:hidden mt-4">
+        <button
+          onClick={() => setContextOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-bg-3 border border-border rounded-xl text-sm font-semibold text-gray-300 hover:text-white transition-colors mb-2"
+        >
+          <div className="flex items-center gap-2">
+            <Zap size={13} className="text-gold" />
+            Live Market Context &amp; Quick Questions
+          </div>
+          <ChevronDown size={14} className={cn('transition-transform text-gray-500', contextOpen && 'rotate-180')} />
+        </button>
+        {contextOpen && <div>{ContextPanel}</div>}
       </div>
     </div>
   );

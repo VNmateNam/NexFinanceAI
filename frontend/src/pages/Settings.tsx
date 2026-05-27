@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { cn } from '../utils/cn';
 import { User, Lock, Eye, EyeOff, Check, Crown, CreditCard, Zap, Sparkles, Shield } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -63,6 +65,21 @@ export function Settings() {
   }
 
   // Detect Stripe return
+  const subscriptionRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const [subHighlight, setSubHighlight] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('scroll') === 'subscription') {
+      setTimeout(() => {
+        subscriptionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setSubHighlight(true);
+        setTimeout(() => setSubHighlight(false), 2500);
+      }, 150);
+    }
+  }, [location.search]);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
 
@@ -304,7 +321,7 @@ export function Settings() {
 
       {/* Subscription — hidden for admin (they have all access by code) */}
       {!isAdmin && (
-        <div className="card">
+        <div className={cn("card transition-all duration-500", subHighlight ? "ring-2 ring-gold/50 border-gold/40" : "")} ref={subscriptionRef}>
           <div className="flex items-center gap-2 mb-4">
             <Crown size={14} className="text-gold" />
             <h2 className="text-sm font-bold">Subscription</h2>

@@ -94,7 +94,7 @@ export function Alerts() {
         <p className="text-gray-400 text-sm mb-6 max-w-sm">
           Price Alerts are available on the Pro plan. Upgrade to set alerts for Gold, Oil, Stocks and get notified instantly.
         </p>
-        <button onClick={() => navigate('/settings')}
+        <button onClick={() => navigate('/settings?scroll=subscription')}
           className="btn-primary flex items-center gap-2 px-6 py-2.5">
           <Crown size={14} /> Upgrade to Pro — $20/mo
         </button>
