@@ -54,6 +54,7 @@ export const authApi = {
 export const pricesApi = {
   getCommodities: () => api.get('/api/prices/commodities').then(r => r.data.data),
   getStocks: (s: string[]) => api.get(`/api/prices/stocks?symbols=${s.join(',')}`).then(r => r.data.data),
+  getCrypto: (s: string[]) => api.get(`/api/prices/crypto?symbols=${s.join(',')}`).then(r => r.data.data),
   getHistory: (sym: string, days = 30) => api.get(`/api/prices/history/${sym}?days=${days}`).then(r => r.data.data),
 };
 export const newsApi = {

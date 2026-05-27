@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getCommodityPrices, getStockPrice, getStockPrices, fetchHistoricalData } from '../services/priceService';
+import { getCommodityPrices, getStockPrice, getStockPrices, fetchCryptoPrices, fetchHistoricalData } from '../services/priceService';
 
 export const pricesRouter = Router();
 
@@ -27,6 +27,15 @@ pricesRouter.get('/stocks/:symbol', async (req: Request, res: Response) => {
     if (!price) return res.status(404).json({ error: `Symbol ${symbol} not found` });
     res.json({ success: true, data: price });
   } catch { res.status(500).json({ error: 'Failed to fetch stock price' }); }
+});
+
+pricesRouter.get('/crypto', async (req: Request, res: Response) => {
+  try {
+    const symbols = ((req.query.symbols as string) || 'BTC,ETH,SOL,BNB,XRP,DOGE')
+      .split(',').map((s: string) => s.trim().toUpperCase()).slice(0, 10);
+    const prices = await fetchCryptoPrices(symbols);
+    res.json({ success: true, data: prices, timestamp: new Date().toISOString() });
+  } catch { res.status(500).json({ error: 'Failed to fetch crypto prices' }); }
 });
 
 pricesRouter.get('/history/:symbol', async (req: Request, res: Response) => {

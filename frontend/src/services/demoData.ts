@@ -24,6 +24,15 @@ export const DEMO_STOCKS: PriceData[] = [
   { symbol: 'GOOGL', name: 'Alphabet',   price:  175.80, change_pct:  0.44, change_abs:   0.77, source: 'demo', fetched_at: new Date().toISOString() },
 ];
 
+export const DEMO_CRYPTO: PriceData[] = [
+  { symbol: 'BTC',  name: 'Bitcoin',   price: 67420.00, change_pct:  2.14, change_abs: 1418.00, source: 'demo', fetched_at: new Date().toISOString() },
+  { symbol: 'ETH',  name: 'Ethereum',  price:  3512.00, change_pct:  1.88, change_abs:   64.90, source: 'demo', fetched_at: new Date().toISOString() },
+  { symbol: 'SOL',  name: 'Solana',    price:   168.40, change_pct:  3.21, change_abs:    5.24, source: 'demo', fetched_at: new Date().toISOString() },
+  { symbol: 'BNB',  name: 'BNB',       price:   598.20, change_pct:  0.74, change_abs:    4.40, source: 'demo', fetched_at: new Date().toISOString() },
+  { symbol: 'XRP',  name: 'XRP',       price:     0.62, change_pct: -0.48, change_abs:  -0.003, source: 'demo', fetched_at: new Date().toISOString() },
+  { symbol: 'DOGE', name: 'Dogecoin',  price:    0.087, change_pct:  1.16, change_abs:   0.001, source: 'demo', fetched_at: new Date().toISOString() },
+];
+
 // Return a live-jittered copy so prices "move" every call
 export function getLivePrices(base: PriceData[]): PriceData[] {
   return base.map(p => {
@@ -36,6 +45,7 @@ export function getLivePrices(base: PriceData[]): PriceData[] {
 const BASE_PRICES: Record<string, number> = {
   XAU: 3200, XAG: 30.5, WTI: 65, BRENT: 68, XPT: 1010,
   AAPL: 200, TSLA: 260, NVDA: 800, MSFT: 408, META: 510, GOOGL: 170,
+  BTC: 60000, ETH: 3200, SOL: 140, BNB: 560, XRP: 0.55, DOGE: 0.08,
 };
 
 export function generateHistory(symbol: string, days: number): HistoricalPoint[] {

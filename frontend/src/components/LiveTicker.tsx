@@ -12,11 +12,15 @@ const FALLBACK = [
   { symbol: 'MSFT', name: 'Microsoft', price:  418.60, change_pct:  0.57 },
   { symbol: 'META', name: 'Meta',      price:  542.30, change_pct:  1.18 },
   { symbol: 'GOOGL',name: 'Alphabet',  price:  175.80, change_pct:  0.44 },
+  { symbol: 'BTC',  name: 'Bitcoin',   price: 67420.00, change_pct:  2.14 },
+  { symbol: 'ETH',  name: 'Ethereum',  price:  3512.00, change_pct:  1.88 },
+  { symbol: 'SOL',  name: 'Solana',    price:   168.40, change_pct:  3.21 },
+  { symbol: 'BNB',  name: 'BNB',       price:   598.20, change_pct:  0.74 },
 ];
 
 export function LiveTicker() {
-  const { commodities, stocks } = useMarketStore();
-  const live = [...commodities, ...stocks];
+  const { commodities, stocks, crypto } = useMarketStore();
+  const live = [...commodities, ...stocks, ...crypto];
   const items = live.length >= 4 ? live : FALLBACK;
 
   // Triple-duplicate so there's always plenty of content to scroll through
@@ -51,7 +55,7 @@ export function LiveTicker() {
                 {item.symbol}
               </span>
               <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'Space Mono, monospace', color: '#f5c842' }}>
-                ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${item.price < 1 ? item.price.toFixed(4) : item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <span style={{
                 fontSize: 10, fontFamily: 'Space Mono, monospace', fontWeight: 700,

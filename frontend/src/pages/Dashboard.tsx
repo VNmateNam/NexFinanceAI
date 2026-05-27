@@ -15,6 +15,10 @@ const CHART_ASSETS = [
   { symbol: 'TSLA',  name: 'Tesla',     color: '#f87171' },
   { symbol: 'NVDA',  name: 'NVIDIA',    color: '#4ade80' },
   { symbol: 'MSFT',  name: 'Microsoft', color: '#60a5fa' },
+  { symbol: 'BTC',   name: 'Bitcoin',   color: '#f97316' },
+  { symbol: 'ETH',   name: 'Ethereum',  color: '#8b5cf6' },
+  { symbol: 'SOL',   name: 'Solana',    color: '#14b8a6' },
+  { symbol: 'BNB',   name: 'BNB',       color: '#eab308' },
 ];
 
 function MetricCard({ label, value, change, color, badge }: any) {
@@ -141,11 +145,11 @@ export function Dashboard() {
               ))}
             </div>
           </div>
-          {/* Asset selector */}
-          <div className="flex flex-wrap gap-1.5 mb-3">
+          {/* Asset selector — scrollable on mobile */}
+          <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 scrollbar-none">
             {CHART_ASSETS.map(a => (
               <button key={a.symbol} onClick={() => setChartSymbol(a.symbol)}
-                className="text-[10px] font-mono font-bold px-2 py-1 rounded border transition-all"
+                className="text-[10px] font-mono font-bold px-2 py-1 rounded border transition-all flex-shrink-0"
                 style={chartSymbol === a.symbol
                   ? { borderColor: a.color, color: a.color, background: `${a.color}18` }
                   : { borderColor: 'rgba(255,255,255,0.08)', color: '#6b7280' }}>

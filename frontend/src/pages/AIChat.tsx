@@ -8,17 +8,17 @@ import { localChat } from '../services/localStore';
 import { cn } from '../utils/cn';
 
 const QUICK_PROMPTS = [
-  { label: 'Should I buy gold today?',        icon: '🥇' },
-  { label: 'What is the oil price outlook?',  icon: '🛢️' },
-  { label: 'Best stocks to watch this week',  icon: '📈' },
-  { label: 'Explain current market sentiment',icon: '🧠' },
-  { label: 'Compare gold vs silver right now',icon: '⚖️' },
+  { label: 'Should I buy gold today?',         icon: '🥇' },
+  { label: 'What is the oil price outlook?',   icon: '🛢️' },
+  { label: 'Best stocks to watch this week',   icon: '📈' },
+  { label: 'Explain current market sentiment', icon: '🧠' },
+  { label: 'Compare gold vs silver right now', icon: '⚖️' },
   { label: 'What is the Fed doing to markets?',icon: '🏦' },
 ];
 
 interface Msg { id: string; role: 'user' | 'assistant'; content: string }
 
-// Inline: **bold**, *italic*, `code`
+// ── Markdown renderer with table support ──────────────────────
 function inlineFmt(text: string): React.ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((p, i) => {
     if (p.startsWith('**') && p.endsWith('**'))
@@ -31,14 +31,66 @@ function inlineFmt(text: string): React.ReactNode[] {
   });
 }
 
-// Full markdown renderer
+function parseTable(lines: string[]): React.ReactNode {
+  // lines[0] = header row, lines[1] = separator, lines[2..] = data rows
+  const parseRow = (line: string) =>
+    line.split('|').map(c => c.trim()).filter((_, i, a) => i !== 0 && i !== a.length - 1);
+
+  const headers = parseRow(lines[0]);
+  const rows = lines.slice(2).map(parseRow);
+
+  return (
+    <div className="overflow-x-auto my-2 rounded-lg border border-border">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border bg-bg-4">
+            {headers.map((h, i) => (
+              <th key={i} className="text-left px-3 py-2 text-gray-400 font-semibold uppercase tracking-wider whitespace-nowrap">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri} className={cn('border-b border-border last:border-0', ri % 2 === 0 ? 'bg-bg-3' : 'bg-bg-2')}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-3 py-2 text-gray-300 font-mono whitespace-nowrap">
+                  {inlineFmt(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function renderMd(content: string) {
   const lines = content.split('\n');
   const out: React.ReactNode[] = [];
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
+
+    // Blank line
     if (!line.trim()) { i++; continue; }
+
+    // Table detection: current line has |, next line is separator (---|)
+    if (line.includes('|') && lines[i+1]?.match(/^\|?[\s\-:|]+\|/)) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].includes('|')) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      if (tableLines.length >= 2) {
+        out.push(<div key={`t${i}`}>{parseTable(tableLines)}</div>);
+        continue;
+      }
+    }
+
+    // Headings
     if (line.startsWith('### ')) {
       out.push(<p key={i} className="text-[10px] font-bold uppercase tracking-widest text-gold/70 mt-3 mb-1 first:mt-0">{inlineFmt(line.slice(4))}</p>);
       i++; continue;
@@ -47,6 +99,8 @@ function renderMd(content: string) {
       out.push(<p key={i} className="text-sm font-bold text-white mt-3 mb-1 first:mt-0">{inlineFmt(line.slice(3))}</p>);
       i++; continue;
     }
+
+    // Unordered list
     if (/^[-*] /.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^[-*] /.test(lines[i])) { items.push(lines[i].slice(2)); i++; }
@@ -62,6 +116,8 @@ function renderMd(content: string) {
       );
       continue;
     }
+
+    // Ordered list
     if (/^\d+\. /.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\d+\. /.test(lines[i])) { items.push(lines[i].replace(/^\d+\. /,'')); i++; }
@@ -77,7 +133,10 @@ function renderMd(content: string) {
       );
       continue;
     }
+
+    // Divider
     if (line.trim() === '---') { out.push(<div key={i} className="border-t border-border my-2" />); i++; continue; }
+
     out.push(<p key={i} className="text-sm leading-relaxed">{inlineFmt(line)}</p>);
     i++;
   }
@@ -87,16 +146,16 @@ function renderMd(content: string) {
 function Bubble({ msg }: { msg: Msg }) {
   const isAI = msg.role === 'assistant';
   return (
-    <div className={cn('flex gap-2.5 items-end', !isAI && 'flex-row-reverse')}>
-      <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mb-0.5 shadow-lg',
+    <div className={cn('flex gap-2 sm:gap-2.5 items-end', !isAI && 'flex-row-reverse')}>
+      <div className={cn('w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mb-0.5 shadow-lg',
         isAI ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-bg'
              : 'bg-gradient-to-br from-violet-500 to-purple-700 text-white')}>
-        {isAI ? <Bot size={13} /> : 'U'}
+        {isAI ? <Bot size={12} /> : 'U'}
       </div>
-      <div className={cn('max-w-[85%] rounded-2xl px-4 py-3 border shadow-sm',
+      <div className={cn('max-w-[90%] sm:max-w-[85%] rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 border shadow-sm min-w-0',
         isAI ? 'bg-bg-3 border-border/60 text-gray-200 rounded-bl-sm'
              : 'bg-violet-600/20 border-violet-500/30 text-gray-100 rounded-br-sm')}>
-        {isAI ? <div className="space-y-1">{renderMd(msg.content)}</div>
+        {isAI ? <div className="space-y-1 overflow-x-auto">{renderMd(msg.content)}</div>
                : <p className="text-sm leading-relaxed">{msg.content}</p>}
       </div>
     </div>
@@ -155,7 +214,6 @@ function AIChatContent({ userId }: { userId: string }) {
   const endRef   = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load persisted chat
   useEffect(() => {
     const saved = localChat.get(userId);
     if (saved.length > 0) {
@@ -171,8 +229,6 @@ function AIChatContent({ userId }: { userId: string }) {
   }, [userId]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
-
-  const saveKey = (_k: string) => {};  // no-op, kept for compat
 
   const send = useCallback(async (text?: string) => {
     const content = (text ?? input).trim();
@@ -217,52 +273,53 @@ function AIChatContent({ userId }: { userId: string }) {
       <h1 className="page-title">AI Financial Assistant</h1>
       <p className="page-sub">Powered by Claude AI · live market context · chat history persists</p>
 
-      <div className="grid lg:grid-cols-3 gap-5">
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-5">
         {/* Chat */}
-        <div className="lg:col-span-2 card flex flex-col" style={{ height: 600 }}>
+        <div className="lg:col-span-2 card flex flex-col" style={{ height: 'min(600px, calc(100svh - 280px))' }}>
           <div className="flex items-center justify-between pb-3 border-b border-border mb-3 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
-                <Bot size={16} className="text-bg" />
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Bot size={14} className="text-bg" />
               </div>
-              <div>
-                <p className="text-sm font-bold">NexusAI Assistant</p>
-                <p className="text-[10px] text-gray-500">Claude AI · live market context</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold truncate">NexusAI Assistant</p>
+                <p className="text-[10px] text-gray-500 hidden sm:block">Claude AI · live market context</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full live-dot"/>
-              <span className="text-xs text-green-400 font-mono">Connected</span>
-              <button onClick={clearChat} className="btn-ghost text-xs ml-1 flex items-center gap-1">
-                <RefreshCw size={11}/> Clear
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full live-dot hidden sm:block"/>
+              <span className="text-xs text-green-400 font-mono hidden sm:block">Connected</span>
+              <button onClick={clearChat} className="btn-ghost text-xs flex items-center gap-1 px-2 py-1">
+                <RefreshCw size={10}/> <span className="hidden sm:inline">Clear</span>
               </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
+          <div className="flex-1 overflow-y-auto space-y-3 sm:space-y-4 pr-1 min-h-0">
             {messages.map(m => <Bubble key={m.id} msg={m} />)}
             {loading && <Typing />}
             <div ref={endRef} />
           </div>
 
-          <div className="flex flex-wrap gap-1.5 mt-3 pt-2 border-t border-border flex-shrink-0">
+          {/* Quick prompts — scroll on mobile */}
+          <div className="flex gap-1.5 mt-3 pt-2 border-t border-border flex-shrink-0 overflow-x-auto pb-1 scrollbar-none">
             {QUICK_PROMPTS.slice(0, 4).map(q => (
               <button key={q.label} onClick={() => send(q.label)} disabled={loading}
-                className="text-xs bg-bg-3 hover:bg-bg-4 border border-border-light hover:border-gold text-gray-400 hover:text-gold px-2.5 py-1 rounded-lg transition-all disabled:opacity-40">
+                className="text-xs bg-bg-3 hover:bg-bg-4 border border-border-light hover:border-gold text-gray-400 hover:text-gold px-2.5 py-1 rounded-lg transition-all disabled:opacity-40 whitespace-nowrap flex-shrink-0">
                 {q.icon} {q.label}
               </button>
             ))}
           </div>
 
           <div className="flex gap-2 mt-2 flex-shrink-0">
-            <input ref={inputRef} className="input flex-1"
+            <input ref={inputRef} className="input flex-1 text-sm"
               placeholder="Ask about gold, oil, stocks…"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
               disabled={loading} />
             <button onClick={() => send()} disabled={loading || !input.trim()}
-              className="bg-gold hover:bg-gold-dark text-bg px-4 rounded-lg transition-all disabled:opacity-40 flex items-center font-bold text-sm flex-shrink-0">
+              className="bg-gold hover:bg-gold-dark text-bg px-3 sm:px-4 rounded-lg transition-all disabled:opacity-40 flex items-center font-bold text-sm flex-shrink-0">
               <Send size={14} />
             </button>
           </div>
@@ -287,7 +344,7 @@ function AIChatContent({ userId }: { userId: string }) {
               ].map(item => (
                 <div key={item.label} className="flex justify-between items-center py-2 border-b border-border last:border-0">
                   <span className="text-gray-500">{item.label}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <span style={{ color: item.color }} className="font-bold">{item.value}</span>
                     <span className={item.chg >= 0 ? 'text-green-400' : 'text-red-400'}>
                       {item.chg >= 0 ? '▲' : '▼'}{Math.abs(item.chg).toFixed(2)}%
@@ -303,7 +360,7 @@ function AIChatContent({ userId }: { userId: string }) {
             <div className="space-y-2">
               {QUICK_PROMPTS.map(q => (
                 <button key={q.label} onClick={() => send(q.label)} disabled={loading}
-                  className="w-full text-left text-sm bg-bg-3 hover:bg-bg-4 border border-border hover:border-gold text-gray-400 hover:text-white px-3 py-2.5 rounded-lg transition-all disabled:opacity-40 flex items-center gap-2">
+                  className="w-full text-left text-xs sm:text-sm bg-bg-3 hover:bg-bg-4 border border-border hover:border-gold text-gray-400 hover:text-white px-3 py-2 sm:py-2.5 rounded-lg transition-all disabled:opacity-40 flex items-center gap-2">
                   <span>{q.icon}</span><span>{q.label}</span>
                 </button>
               ))}
