@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '../utils/cn';
 import { User, Lock, Eye, EyeOff, Check, Crown, CreditCard, Zap, Sparkles, Shield } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
@@ -66,7 +65,6 @@ export function Settings() {
 
   // Detect Stripe return
   const subscriptionRef = useRef<HTMLDivElement>(null);
-  const location = useLocation();
   const [subHighlight, setSubHighlight] = useState(false);
 
   useEffect(() => {
